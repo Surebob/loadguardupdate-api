@@ -79,14 +79,6 @@ To add new datasets to be processed:
 
 Modify the `src/error_handler.py` file to add new error types or customize error handling behavior.
 
-## Contributing
-
-Please read CONTRIBUTING.md for details on our code of conduct, and the process for submitting pull requests.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE.md file for details.
-
 ## Acknowledgments
 
 - Socrata for providing the open data API
