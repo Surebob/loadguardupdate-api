@@ -1,18 +1,39 @@
 import os
 
+# Base directory of the project
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-SOCRATA_BASE_URL = "https://datahub.transportation.gov"
-SOCRATA_APP_TOKEN = os.getenv('SOCRATA_APP_TOKEN')
-SOCRATA_SECRET_TOKEN = os.getenv('SOCRATA_SECRET_TOKEN')
-KNIME_EXECUTABLE = "/path/to/knime"
-KNIME_WORKFLOW_DIR = "/path/to/existing/knime/workflow/directory"
+# Directory to store downloaded data
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-DATASETS = [
-    {"id": "qh9u-swkp", "name": "Primary Dataset", "category": "INSPECTIONS"},
-    {"id": "placeholder1", "name": "Dataset 1", "category": "CENSUS"},
-    # Add more datasets as needed
+# KNIME settings
+KNIME_EXECUTABLE = "/path/to/knime"
+KNIME_WORKFLOW_DIR = "/path/to/existing/knime/workflow/directory"
+
+# Update interval in hours
+CHECK_INTERVAL_HOURS = 1
+
+# Logging configuration
+LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')
+LOG_LEVEL = 'INFO'
+
+# Dataset configurations are now handled in the SocrataAPI class
+# If you need to reference dataset names elsewhere in your application,
+# you can define them here:
+DATASET_NAMES = [
+    'ActPendInsur',
+    'AuthHist',
+    'CarrierAllWithHistory',
+    'NewCompanyCensusFile',
+    'VehicleInspectionsFile',
+    'InspectionPerUnit',
+    'InsurAllWithHistory',
+    'CrashFile'
 ]
 
-CHECK_INTERVAL_HOURS = 1
+# Dropbox dataset names
+DROPBOX_DATASET_NAMES = [
+    'CENSUS_PUB_20240509_1of3',
+    'CENSUS_PUB_20240509_2of3',
+    'CENSUS_PUB_20240509_3of3'
+]
