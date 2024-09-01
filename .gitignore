@@ -109,3 +109,4 @@ data/*
 config/*
 !config/.gitkeep
 config/settings.py
+AppTokenDoc.md
