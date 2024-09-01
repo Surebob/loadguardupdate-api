@@ -3,6 +3,7 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SOCRATA_BASE_URL = "https://datahub.transportation.gov"
+SOCRATA_APP_TOKEN = "YOUR_API_KEY_HERE"
 KNIME_EXECUTABLE = "/path/to/knime"
 KNIME_WORKFLOW_DIR = "/path/to/existing/knime/workflow/directory"
 DATA_DIR = os.path.join(BASE_DIR, "data")

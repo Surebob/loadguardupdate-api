@@ -106,6 +106,3 @@ logs/*
 !logs/.gitkeep
 data/*
 !data/.gitkeep
-config/*
-!config/.gitkeep
-config/settings.py
