@@ -11,7 +11,7 @@ This project integrates Socrata datasets with KNIME workflows, providing automat
 
 ## System Architecture
 
-![KNIME-Socrata Integration System](https://your-image-hosting-url.com/knime_socrata_chart.png)
+![KNIME-Socrata Integration System](https://github.com/Load-Guard/LoadGuard-KNIME-Socrata-Integration-System/blob/main/assets/LoadGuard_Knime.png)
 
 The system consists of the following main components:
 
