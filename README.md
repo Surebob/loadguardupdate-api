@@ -16,7 +16,6 @@ This project integrates Socrata datasets with KNIME workflows, providing automat
 The system consists of the following main components:
 
 1. **Socrata API**: External data source providing access to various datasets.
-2. **SocrataAPI**: Handles communication with the Socrata API, fetching data and metadata.
 3. **DataProcessor**: Orchestrates data processing, determining if datasets need updating.
 4. **FileManager**: Manages local file operations, saving and updating dataset files.
 5. **KNIME Runner**: Executes KNIME workflows with updated dataset information.
