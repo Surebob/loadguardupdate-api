@@ -1,17 +1,28 @@
+import sys
+import os
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.knime_runner import KNIMERunner
 from src.error_handler import KNIMEError
 from config.settings import KNIME_EXECUTABLE
-import sys
+from config.logging_config import configure_logging
 import logging
+
+# Configure logging
+configure_logging()
+logger = logging.getLogger(__name__)
 
 def main(params=None):
     knime_runner = KNIMERunner(KNIME_EXECUTABLE)
     try:
+        logger.info("Attempting to run KNIME workflow")
         output = knime_runner.run_workflow(params)
-        logging.info(f"KNIME workflow executed successfully")
-        logging.info(f"Output: {output}")
+        logger.info("KNIME workflow executed successfully")
+        logger.info(f"Output: {output}")
     except KNIMEError as e:
-        logging.error(f"Error running KNIME workflow: {str(e)}")
+        logger.error(f"Error running KNIME workflow: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":

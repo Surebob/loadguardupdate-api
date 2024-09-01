@@ -37,13 +37,13 @@ The system consists of the following main components:
 To run the automated update process: 
 
 ```
-python scripts/run_update.py`
+python scripts/run_update.py
 ```
 
 To manually run a KNIME workflow: 
 
 ```
-python scripts/run_knime_workflow.py <workflow_name> [param1=value1 param2=value2 ...]
+python scripts/run_knime_workflow.py
 ```
 
 ## Project Structure
