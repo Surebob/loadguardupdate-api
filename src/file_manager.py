@@ -7,13 +7,13 @@ class FileManager:
     def __init__(self, base_dir):
         self.base_dir = base_dir
 
-    def save_dataset(self, dataset_id, category, data):
+    def save_dataset(self, dataset_id, data):
         try:
-            category_dir = os.path.join(self.base_dir, category)
-            os.makedirs(category_dir, exist_ok=True)
+            dataset_dir = os.path.join(self.base_dir, dataset_id)
+            os.makedirs(dataset_dir, exist_ok=True)
             
-            temp_file = os.path.join(category_dir, f"{dataset_id}_temp.csv")
-            final_file = os.path.join(category_dir, f"{dataset_id}_latest.csv")
+            temp_file = os.path.join(dataset_dir, f"{dataset_id}_temp.csv")
+            final_file = os.path.join(dataset_dir, f"{dataset_id}.csv")
             
             with open(temp_file, "wb") as f:
                 f.write(data)
