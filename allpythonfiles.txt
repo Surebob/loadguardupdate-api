@@ -1,0 +1,526 @@
+scripts/run_update.py
+
+import sys
+import os
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import schedule
+import time
+from datetime import datetime, timedelta
+from src.socrata_api import SocrataAPI
+from src.data_processor import DataProcessor
+from src.file_manager import FileManager
+from src.knime_runner import KNIMERunner
+from src.zip_file_handler import ZipFileHandler
+from config.settings import KNIME_EXECUTABLE, DATA_DIR, CHECK_INTERVAL_HOURS
+from src.error_handler import KNIMEError
+from config.logging_config import configure_logging
+import logging
+
+# Configure logging
+configure_logging()
+logger = logging.getLogger(__name__)
+
+def job():
+    logger.info("Running update job")
+    api = SocrataAPI(DATA_DIR)
+    file_manager = FileManager(DATA_DIR)
+    processor = DataProcessor(api, file_manager)
+    knime_runner = KNIMERunner(KNIME_EXECUTABLE)
+    zip_handler = ZipFileHandler(DATA_DIR)
+
+    updated_datasets = []
+
+    # Process Socrata datasets
+    for dataset_name in api.datasets:
+        try:
+            logger.info(f"Processing dataset: {dataset_name}")
+            if processor.process_dataset(dataset_name):
+                updated_datasets.append(dataset_name)
+                logger.info(f"Dataset {dataset_name} was updated")
+            else:
+                logger.info(f"No updates for dataset {dataset_name}")
+        except Exception as e:
+            logger.error(f"Error processing dataset {dataset_name}: {str(e)}", exc_info=True)
+
+    # Process ZIP files
+    zip_files = [
+        "ftp://ftp.senture.com/Inspection_2024Jul.zip",
+        "https://ai.fmcsa.dot.gov/SMS/files/SMS_AB_PassProperty_2024Jun.zip"
+    ]
+    for zip_url in zip_files:
+        try:
+            if zip_handler.check_and_download(zip_url):
+                updated_datasets.append(os.path.basename(zip_url))
+                logger.info(f"ZIP file {os.path.basename(zip_url)} was updated")
+            else:
+                logger.info(f"No update needed for ZIP file {os.path.basename(zip_url)}")
+        except Exception as e:
+            logger.error(f"Error processing ZIP file {zip_url}: {str(e)}", exc_info=True)
+
+    if updated_datasets:
+        logger.info("Downloading Dropbox datasets")
+        api.download_dropbox_datasets()
+        try:
+            logger.info("Running KNIME workflow")
+            output = knime_runner.run_workflow({"updated_datasets": ",".join(updated_datasets)})
+            logger.info("KNIME workflow executed successfully")
+            logger.debug(f"KNIME output: {output}")
+        except KNIMEError as e:
+            logger.error(f"Error running KNIME workflow: {str(e)}", exc_info=True)
+    else:
+        logger.info("No datasets were updated, skipping KNIME workflow execution")
+
+def main():
+    logger.info("Starting the update process")
+    
+    # Run the job immediately
+    job()
+    
+    # Then schedule it
+    schedule.every(CHECK_INTERVAL_HOURS).hours.do(job)
+    logger.info(f"Scheduled job to run every {CHECK_INTERVAL_HOURS} hours")
+
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        logger.critical(f"Critical error in main execution: {str(e)}", exc_info=True)
+
+scripts/run_knime_workflow.py
+
+import sys
+import os
+
+# Add the project root directory to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.knime_runner import KNIMERunner
+from src.error_handler import KNIMEError
+from config.settings import KNIME_EXECUTABLE
+from config.logging_config import configure_logging
+import logging
+
+# Configure logging
+configure_logging()
+logger = logging.getLogger(__name__)
+
+def main(params=None):
+    knime_runner = KNIMERunner(KNIME_EXECUTABLE)
+    try:
+        logger.info("Attempting to run KNIME workflow")
+        output = knime_runner.run_workflow(params)
+        logger.info("KNIME workflow executed successfully")
+        logger.info(f"Output: {output}")
+    except KNIMEError as e:
+        logger.error(f"Error running KNIME workflow: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    params = dict(arg.split('=') for arg in sys.argv[1:] if '=' in arg)
+    main(params)
+
+src/socrata_api.py
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from src.error_handler import APIError
+from datetime import datetime
+import os
+
+class SocrataAPI:
+    def __init__(self, base_dir, timeout=10, retries=3):
+        self.base_dir = base_dir
+        self.session = requests.Session()
+        retry = Retry(total=retries, backoff_factor=0.1)
+        self.session.mount('https://', HTTPAdapter(max_retries=retry))
+        self.timeout = timeout
+
+        self.datasets = {
+            'ActPendInsur': 'https://datahub.transportation.gov/api/views/qh9u-swkp',
+            'AuthHist': 'https://data.transportation.gov/api/views/9mw4-x3tu',
+            'CarrierAllWithHistory': 'https://data.transportation.gov/api/views/6eyk-hxee',
+            'NewCompanyCensusFile': 'https://data.transportation.gov/api/views/az4n-8mr2',
+            'VehicleInspectionsFile': 'https://data.transportation.gov/api/views/fx4q-ay7w',
+            'InspectionPerUnit': 'https://data.transportation.gov/api/views/wt8s-2hbx',
+            'InsurAllWithHistory': 'https://data.transportation.gov/api/views/ypjt-5ydn',
+            'CrashFile': 'https://datahub.transportation.gov/api/views/aayw-vxb3'
+        }
+
+        self.dropbox_datasets = [
+            'https://www.dropbox.com/scl/fi/rrn5p8ha4x7wd6bb86gwz/CENSUS_PUB_20240509_1of3.csv?rlkey=wc9j8p0ugmb4o0ngoxs1lku6a&st=cbgzc1sb&dl=1',
+            'https://www.dropbox.com/scl/fi/hlbew8zt2v7iha72gn5ce/CENSUS_PUB_20240509_2of3.csv?rlkey=siv1rag8c1875t471l8uussnz&st=wwlbggvj&dl=1',
+            'https://www.dropbox.com/scl/fi/zj5tznnlmzqrt21jo71f4/CENSUS_PUB_20240509_3of3.csv?rlkey=ld3z7jgsp26ka9d74ryzkpayp&st=farqx7zi&dl=1'
+        ]
+
+    def check_dataset_update(self, dataset_name):
+        if dataset_name not in self.datasets:
+            raise ValueError(f"Unknown dataset: {dataset_name}")
+
+        try:
+            url = self.datasets[dataset_name]
+            response = self.session.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+            last_updated = data.get('rowsUpdatedAt')
+            if last_updated:
+                return datetime.fromtimestamp(last_updated)
+            else:
+                raise APIError(f"No 'rowsUpdatedAt' field found for dataset {dataset_name}")
+        except requests.RequestException as e:
+            raise APIError(f"Failed to check update for dataset {dataset_name}: {str(e)}")
+
+    def download_dataset(self, dataset_name, is_dropbox=False):
+        if is_dropbox:
+            url = dataset_name
+        elif dataset_name in self.datasets:
+            url = f"{self.datasets[dataset_name]}/rows.csv?accessType=DOWNLOAD&api_foundry=true"
+        else:
+            raise ValueError(f"Unknown dataset: {dataset_name}")
+
+        try:
+            response = self.session.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            return response.content
+        except requests.RequestException as e:
+            raise APIError(f"Failed to download dataset {dataset_name}: {str(e)}")
+
+    def update_and_download_datasets(self):
+        any_updates = False
+
+        for dataset_name in self.datasets:
+            try:
+                dataset_dir = os.path.join(self.base_dir, dataset_name)
+                os.makedirs(dataset_dir, exist_ok=True)
+                file_path = os.path.join(dataset_dir, f"{dataset_name}.csv")
+
+                last_updated = self.check_dataset_update(dataset_name)
+                
+                if not os.path.exists(file_path) or last_updated > datetime.fromtimestamp(os.path.getmtime(file_path)):
+                    print(f"Updating {dataset_name}")
+                    data = self.download_dataset(dataset_name)
+                    with open(file_path, 'wb') as f:
+                        f.write(data)
+                    any_updates = True
+                else:
+                    print(f"{dataset_name} is up to date")
+            except APIError as e:
+                print(f"Error updating {dataset_name}: {str(e)}")
+
+        if any_updates:
+            self.download_dropbox_datasets()
+
+    def download_dropbox_datasets(self):
+        for i, url in enumerate(self.dropbox_datasets, 1):
+            try:
+                file_path = os.path.join(self.base_dir, f"CENSUS_PUB_20240509_{i}of3.csv")
+                print(f"Downloading CENSUS_PUB_20240509_{i}of3.csv")
+                data = self.download_dataset(url, is_dropbox=True)
+                with open(file_path, 'wb') as f:
+                    f.write(data)
+            except APIError as e:
+                print(f"Error downloading CENSUS_PUB_20240509_{i}of3.csv: {str(e)}")
+
+src/knime_runner.py
+
+import subprocess
+import os
+from src.error_handler import KNIMEError
+from config.settings import KNIME_WORKFLOW_DIR
+
+class KNIMERunner:
+    def __init__(self, knime_executable):
+        self.knime_executable = knime_executable
+
+    def run_workflow(self, params=None):
+        try:
+            command = [
+                self.knime_executable,
+                "-application", "org.knime.product.KNIME_BATCH_APPLICATION",
+                "-workflowDir", KNIME_WORKFLOW_DIR,
+                "-reset",
+                "-nosplash",
+                "-nosave",
+            ]
+            
+            if params:
+                for key, value in params.items():
+                    command.extend(["-workflow.variable", f"{key},{value},String"])
+
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            error_message = f"KNIME workflow execution failed. Exit code: {e.returncode}. Error output: {e.stderr}"
+            raise KNIMEError(error_message)
+
+src/zip_file_handler.py
+
+import os
+import requests
+from ftplib import FTP
+from urllib.parse import urlparse
+from datetime import datetime
+import logging
+
+class ZipFileHandler:
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
+        self.logger = logging.getLogger(__name__)
+
+    def check_and_download(self, url):
+        parsed_url = urlparse(url)
+        remote_filename = os.path.basename(parsed_url.path)
+        file_dir = os.path.join(self.base_dir, os.path.splitext(remote_filename)[0])
+        os.makedirs(file_dir, exist_ok=True)
+        local_path = os.path.join(file_dir, remote_filename)
+
+        remote_date = self._extract_date_from_filename(remote_filename)
+
+        if os.path.exists(local_path):
+            local_filename = os.path.basename(local_path)
+            local_date = self._extract_date_from_filename(local_filename)
+            if remote_date <= local_date:
+                self.logger.info(f"No update needed for {remote_filename}")
+                return False
+
+        self.logger.info(f"Newer version available for {remote_filename}")
+        if parsed_url.scheme == 'ftp':
+            self._download_ftp(parsed_url, local_path)
+        elif parsed_url.scheme in ['http', 'https']:
+            self._download_http(url, local_path)
+        self.logger.info(f"Downloaded {remote_filename}")
+        return True
+
+    def _extract_date_from_filename(self, filename):
+        # Extract date from filename (assuming format like 'YYYY-MM' or 'YYYYMM')
+        date_str = ''.join(filter(str.isdigit, filename))[-6:]
+        return datetime.strptime(date_str, '%Y%m')
+
+    def _download_ftp(self, parsed_url, local_path):
+        with FTP(parsed_url.netloc) as ftp:
+            ftp.login()
+            with open(local_path, 'wb') as f:
+                ftp.retrbinary(f'RETR {parsed_url.path}', f.write)
+
+    def _download_http(self, url, local_path):
+        response = requests.get(url)
+        response.raise_for_status()
+        with open(local_path, 'wb') as f:
+            f.write(response.content)
+
+src/data_processor.py
+
+import os
+import json
+from datetime import datetime
+from src.socrata_api import SocrataAPI
+from src.file_manager import FileManager
+from src.error_handler import ProcessingError
+import logging
+
+class DataProcessor:
+    def __init__(self, api: SocrataAPI, file_manager: FileManager):
+        self.api = api
+        self.file_manager = file_manager
+
+    def process_dataset(self, dataset_name):
+        try:
+            current_update_time = self.api.check_dataset_update(dataset_name)
+            dataset_dir = os.path.join(self.file_manager.base_dir, dataset_name)
+            metadata_file = os.path.join(dataset_dir, f"{dataset_name}_metadata.json")
+            
+            needs_update = True
+            if os.path.exists(metadata_file):
+                with open(metadata_file, 'r') as f:
+                    metadata = json.load(f)
+                last_update_time = datetime.fromisoformat(metadata.get('rowsUpdatedAt'))
+                needs_update = current_update_time > last_update_time
+
+            if needs_update:
+                data = self.api.download_dataset(dataset_name)
+                saved_path = self.file_manager.save_dataset(dataset_name, data)
+                
+                # Save metadata
+                os.makedirs(dataset_dir, exist_ok=True)
+                with open(metadata_file, 'w') as f:
+                    json.dump({'rowsUpdatedAt': current_update_time.isoformat()}, f)
+                
+                logging.info(f"Updated file for {dataset_name}: {saved_path}")
+                return True
+            else:
+                logging.info(f"No updates for dataset {dataset_name}")
+                return False
+        except Exception as e:
+            raise ProcessingError(f"Error processing dataset {dataset_name}: {str(e)}")
+
+src/file_manager.py
+
+import os
+import shutil
+import hashlib
+from src.error_handler import FileError
+
+class FileManager:
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
+
+    def save_dataset(self, dataset_id, data):
+        try:
+            dataset_dir = os.path.join(self.base_dir, dataset_id)
+            os.makedirs(dataset_dir, exist_ok=True)
+            
+            temp_file = os.path.join(dataset_dir, f"{dataset_id}_temp.csv")
+            final_file = os.path.join(dataset_dir, f"{dataset_id}.csv")
+            
+            with open(temp_file, "wb") as f:
+                f.write(data)
+            
+            if not os.path.exists(final_file) or not self._files_are_identical(temp_file, final_file):
+                shutil.move(temp_file, final_file)
+                return final_file
+            else:
+                os.remove(temp_file)
+                return None
+        except Exception as e:
+            raise FileError(f"Failed to save dataset {dataset_id}: {str(e)}")
+
+    def _files_are_identical(self, file1, file2):
+        return self._get_file_hash(file1) == self._get_file_hash(file2)
+
+    def _get_file_hash(self, file_path):
+        hasher = hashlib.md5()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
+config/settings.py
+
+import os
+
+# Base directory of the project
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Directory to store downloaded data
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+# KNIME settings
+KNIME_EXECUTABLE = "/path/to/knime"
+KNIME_WORKFLOW_DIR = "/path/to/existing/knime/workflow/directory"
+
+# Update interval in hours
+CHECK_INTERVAL_HOURS = 1
+
+# Logging configuration
+LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')
+LOG_LEVEL = 'INFO'
+
+# Dataset configurations are now handled in the SocrataAPI class
+# If you need to reference dataset names elsewhere in your application,
+# you can define them here:
+DATASET_NAMES = [
+    'ActPendInsur',
+    'AuthHist',
+    'CarrierAllWithHistory',
+    'NewCompanyCensusFile',
+    'VehicleInspectionsFile',
+    'InspectionPerUnit',
+    'InsurAllWithHistory',
+    'CrashFile'
+]
+
+# Dropbox dataset names
+DROPBOX_DATASET_NAMES = [
+    'CENSUS_PUB_20240509_1of3',
+    'CENSUS_PUB_20240509_2of3',
+    'CENSUS_PUB_20240509_3of3'
+]
+
+src/error_handler.py
+
+class APIError(Exception):
+    pass
+
+class ProcessingError(Exception):
+    pass
+
+class KNIMEError(Exception):
+    pass
+
+class FileError(Exception):
+    pass
+
+config/logging_config.py
+
+import logging
+import logging.config
+import os
+from config.settings import BASE_DIR, LOG_LEVEL
+
+# Ensure the logs directory exists
+log_dir = os.path.join(BASE_DIR, 'logs')
+os.makedirs(log_dir, exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s - %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(log_dir, 'app.log'),
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        'socrata_api': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'data_processor': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'file_manager': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'knime_runner': {
+            'handlers': ['console', 'file'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}
+
+def configure_logging():
+    logging.config.dictConfig(LOGGING)

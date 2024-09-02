@@ -11,6 +11,7 @@ from src.socrata_api import SocrataAPI
 from src.data_processor import DataProcessor
 from src.file_manager import FileManager
 from src.knime_runner import KNIMERunner
+from src.zip_file_handler import ZipFileHandler
 from config.settings import KNIME_EXECUTABLE, DATA_DIR, CHECK_INTERVAL_HOURS
 from src.error_handler import KNIMEError
 from config.logging_config import configure_logging
@@ -26,9 +27,11 @@ def job():
     file_manager = FileManager(DATA_DIR)
     processor = DataProcessor(api, file_manager)
     knime_runner = KNIMERunner(KNIME_EXECUTABLE)
+    zip_handler = ZipFileHandler(DATA_DIR)
 
     updated_datasets = []
 
+    # Process Socrata datasets
     for dataset_name in api.datasets:
         try:
             logger.info(f"Processing dataset: {dataset_name}")
@@ -39,6 +42,21 @@ def job():
                 logger.info(f"No updates for dataset {dataset_name}")
         except Exception as e:
             logger.error(f"Error processing dataset {dataset_name}: {str(e)}", exc_info=True)
+
+    # Process ZIP files
+    zip_files = [
+        "ftp://ftp.senture.com/Inspection_2024Jul.zip",
+        "https://ai.fmcsa.dot.gov/SMS/files/SMS_AB_PassProperty_2024Jun.zip"
+    ]
+    for zip_url in zip_files:
+        try:
+            if zip_handler.check_and_download(zip_url):
+                updated_datasets.append(os.path.basename(zip_url))
+                logger.info(f"ZIP file {os.path.basename(zip_url)} was updated")
+            else:
+                logger.info(f"No update needed for ZIP file {os.path.basename(zip_url)}")
+        except Exception as e:
+            logger.error(f"Error processing ZIP file {zip_url}: {str(e)}", exc_info=True)
 
     if updated_datasets:
         logger.info("Downloading Dropbox datasets")

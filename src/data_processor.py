@@ -12,14 +12,30 @@ class DataProcessor:
 
     def process_dataset(self, dataset_name):
         try:
-            last_update = self.api.check_dataset_update(dataset_name)
-            file_path = os.path.join(self.file_manager.base_dir, dataset_name, f"{dataset_name}.csv")
+            current_metadata = self.api.check_dataset_update(dataset_name)
+            current_update_time = datetime.fromtimestamp(current_metadata['rowsUpdatedAt'])
             
-            if not os.path.exists(file_path) or last_update > datetime.fromtimestamp(os.path.getmtime(file_path)):
+            saved_metadata = self.file_manager.read_metadata(dataset_name)
+            
+            needs_update = True
+            if saved_metadata and 'rowsUpdatedAt' in saved_metadata:
+                last_update_time = datetime.fromisoformat(saved_metadata['rowsUpdatedAt'])
+                needs_update = current_update_time > last_update_time
+
+            if needs_update:
                 data = self.api.download_dataset(dataset_name)
                 saved_path = self.file_manager.save_dataset(dataset_name, data)
-                logging.info(f"Updated file for {dataset_name}: {saved_path}")
-                return True
+                
+                if saved_path:
+                    # Save metadata only if the dataset was actually updated
+                    self.file_manager.save_metadata(dataset_name, {
+                        'rowsUpdatedAt': current_update_time.isoformat()
+                    })
+                    logging.info(f"Updated file for {dataset_name}: {saved_path}")
+                    return True
+                else:
+                    logging.info(f"No changes in data for {dataset_name}")
+                    return False
             else:
                 logging.info(f"No updates for dataset {dataset_name}")
                 return False

@@ -1,4 +1,5 @@
 import os
+import json
 import shutil
 import hashlib
 from src.error_handler import FileError
@@ -26,6 +27,30 @@ class FileManager:
                 return None
         except Exception as e:
             raise FileError(f"Failed to save dataset {dataset_id}: {str(e)}")
+
+    def read_metadata(self, dataset_id):
+        try:
+            dataset_dir = os.path.join(self.base_dir, dataset_id)
+            metadata_file = os.path.join(dataset_dir, f"{dataset_id}_metadata.json")
+            
+            if os.path.exists(metadata_file):
+                with open(metadata_file, 'r') as f:
+                    return json.load(f)
+            else:
+                return None
+        except Exception as e:
+            raise FileError(f"Failed to read metadata for dataset {dataset_id}: {str(e)}")
+
+    def save_metadata(self, dataset_id, metadata):
+        try:
+            dataset_dir = os.path.join(self.base_dir, dataset_id)
+            os.makedirs(dataset_dir, exist_ok=True)
+            metadata_file = os.path.join(dataset_dir, f"{dataset_id}_metadata.json")
+            
+            with open(metadata_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
+        except Exception as e:
+            raise FileError(f"Failed to save metadata for dataset {dataset_id}: {str(e)}")
 
     def _files_are_identical(self, file1, file2):
         return self._get_file_hash(file1) == self._get_file_hash(file2)
