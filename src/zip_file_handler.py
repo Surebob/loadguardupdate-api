@@ -35,9 +35,14 @@ class ZipFileHandler:
         return True
 
     def _extract_date_from_filename(self, filename):
-        # Extract date from filename (assuming format like 'YYYY-MM' or 'YYYYMM')
-        date_str = ''.join(filter(str.isdigit, filename))[-6:]
-        return datetime.strptime(date_str, '%Y%m')
+        # Extract date from filename (assuming format like 'YYYYMM' or 'YYYYMMM')
+        date_str = ''.join(filter(str.isdigit, filename))
+        if len(date_str) == 6:
+            return datetime.strptime(date_str, '%Y%m')
+        elif len(date_str) == 4:
+            return datetime.strptime(date_str, '%Y')
+        else:
+            raise ValueError(f"Unexpected date format in filename: {filename}")
 
     def _download_ftp(self, parsed_url, local_path):
         with FTP(parsed_url.netloc) as ftp:

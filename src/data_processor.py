@@ -12,8 +12,7 @@ class DataProcessor:
 
     def process_dataset(self, dataset_name):
         try:
-            current_metadata = self.api.check_dataset_update(dataset_name)
-            current_update_time = datetime.fromtimestamp(current_metadata['rowsUpdatedAt'])
+            current_update_time = self.api.check_dataset_update(dataset_name)
             
             saved_metadata = self.file_manager.read_metadata(dataset_name)
             
