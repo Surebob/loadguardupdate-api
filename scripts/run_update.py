@@ -1,92 +1,90 @@
 import sys
 import os
-
-# Add the project root directory to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import asyncio
 import schedule
 import time
 from datetime import datetime, timedelta
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.socrata_api import SocrataAPI
-from src.data_processor import DataProcessor
-from src.file_manager import FileManager
 from src.knime_runner import KNIMERunner
 from src.zip_file_handler import ZipFileHandler
-from config.settings import KNIME_EXECUTABLE, DATA_DIR, CHECK_INTERVAL_HOURS
-from src.error_handler import KNIMEError
+from src.dropbox_handler import DropboxHandler
+from config.settings import KNIME_EXECUTABLE, DATA_DIR, SCHEDULE_TIME, TIMEZONE
+from src.error_handler import KNIMEError, APIError
 from config.logging_config import configure_logging
 import logging
 
-# Configure logging
 configure_logging()
 logger = logging.getLogger(__name__)
 
-def job():
+async def job():
     logger.info("Running update job")
-    api = SocrataAPI(DATA_DIR)
-    file_manager = FileManager(DATA_DIR)
-    processor = DataProcessor(api, file_manager)
+    socrata_api = SocrataAPI(DATA_DIR)
     knime_runner = KNIMERunner(KNIME_EXECUTABLE)
     zip_handler = ZipFileHandler(DATA_DIR)
+    dropbox_handler = DropboxHandler(DATA_DIR)
 
     updated_datasets = []
 
     # Process Socrata datasets
-    for dataset_name in api.datasets:
-        try:
-            logger.info(f"Processing dataset: {dataset_name}")
-            if processor.process_dataset(dataset_name):
-                updated_datasets.append(dataset_name)
-                logger.info(f"Dataset {dataset_name} was updated")
-            else:
-                logger.info(f"No updates for dataset {dataset_name}")
-        except Exception as e:
-            logger.error(f"Error processing dataset {dataset_name}: {str(e)}", exc_info=True)
+    if await socrata_api.update_and_download_datasets():
+        updated_datasets.extend(socrata_api.datasets.keys())
 
     # Process ZIP files
-    zip_files = [
-        "ftp://ftp.senture.com/Inspection_2024Jul.zip",
-        "https://ai.fmcsa.dot.gov/SMS/files/SMS_AB_PassProperty_2024Jun.zip"
-    ]
-    for zip_url in zip_files:
-        try:
-            if zip_handler.check_and_download(zip_url):
-                updated_datasets.append(os.path.basename(zip_url))
-                logger.info(f"ZIP file {os.path.basename(zip_url)} was updated")
-            else:
-                logger.info(f"No update needed for ZIP file {os.path.basename(zip_url)}")
-        except Exception as e:
-            logger.error(f"Error processing ZIP file {zip_url}: {str(e)}", exc_info=True)
+    zip_results = await zip_handler.download_all()
+    updated_datasets.extend([os.path.splitext(os.path.basename(url))[0] for url, result in zip_results if result])
+
+    # Process Dropbox datasets
+    dropbox_results = await dropbox_handler.download_datasets()
+    updated_datasets.extend([os.path.splitext(os.path.basename(url.split('?')[0]))[0] for url, result in dropbox_results if result])
 
     if updated_datasets:
-        logger.info("Downloading Dropbox datasets")
-        api.download_dropbox_datasets()
         try:
             logger.info("Running KNIME workflow")
-            output = knime_runner.run_workflow({"updated_datasets": ",".join(updated_datasets)})
+            output = await knime_runner.run_workflow()  # Remove the argument here
             logger.info("KNIME workflow executed successfully")
             logger.debug(f"KNIME output: {output}")
         except KNIMEError as e:
-            logger.error(f"Error running KNIME workflow: {str(e)}", exc_info=True)
+            logger.error(f"Error running KNIME workflow: {str(e)}")
     else:
         logger.info("No datasets were updated, skipping KNIME workflow execution")
+
+def run_job():
+    asyncio.run(job())
 
 def main():
     logger.info("Starting the update process")
     
     # Run the job immediately
-    job()
+    run_job()
     
-    # Then schedule it
-    schedule.every(CHECK_INTERVAL_HOURS).hours.do(job)
-    logger.info(f"Scheduled job to run every {CHECK_INTERVAL_HOURS} hours")
-
+    # Schedule the job to run at the specified time
+    schedule.every().day.at(SCHEDULE_TIME).do(run_job)
+    
+    logger.info(f"Scheduled to run daily at {SCHEDULE_TIME} {TIMEZONE}")
+    
     while True:
+        # Calculate time until next run
+        now = datetime.now(TIMEZONE)
+        next_run = schedule.next_run()
+        if next_run:
+            # Convert next_run to timezone-aware
+            next_run = TIMEZONE.localize(next_run.replace(tzinfo=None))
+            sleep_seconds = (next_run - now).total_seconds()
+            sleep_seconds = max(0, min(sleep_seconds, 3600))  # Sleep at most 1 hour
+            logger.info(f"Sleeping for {sleep_seconds / 60:.2f} minutes until next check")
+            time.sleep(sleep_seconds)
+        else:
+            time.sleep(3600)  # If no next run, sleep for 1 hour
+        
         schedule.run_pending()
-        time.sleep(60)
 
 if __name__ == "__main__":
     try:
         main()
+    except KeyboardInterrupt:
+        logger.info("Update process stopped by user")
     except Exception as e:
         logger.critical(f"Critical error in main execution: {str(e)}", exc_info=True)

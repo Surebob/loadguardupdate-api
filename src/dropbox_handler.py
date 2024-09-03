@@ -1,26 +1,51 @@
 # src/dropbox_handler.py
 
 import os
-import requests
+from datetime import datetime
 from src.error_handler import APIError
+import logging
+from src.file_manager import FileManager
+from config.settings import DROPBOX_DATASETS
 
 class DropboxHandler:
     def __init__(self, base_dir):
-        self.base_dir = base_dir
-        self.dropbox_datasets = [
-            'https://www.dropbox.com/scl/fi/rrn5p8ha4x7wd6bb86gwz/CENSUS_PUB_20240509_1of3.csv?rlkey=wc9j8p0ugmb4o0ngoxs1lku6a&st=cbgzc1sb&dl=1',
-            'https://www.dropbox.com/scl/fi/hlbew8zt2v7iha72gn5ce/CENSUS_PUB_20240509_2of3.csv?rlkey=siv1rag8c1875t471l8uussnz&st=wwlbggvj&dl=1',
-            'https://www.dropbox.com/scl/fi/zj5tznnlmzqrt21jo71f4/CENSUS_PUB_20240509_3of3.csv?rlkey=ld3z7jgsp26ka9d74ryzkpayp&st=farqx7zi&dl=1'
-        ]
+        self.base_dir = os.path.join(base_dir, "CENSUS_FILES")
+        self.logger = logging.getLogger(__name__)
+        self.dropbox_datasets = DROPBOX_DATASETS
 
-    def download_datasets(self):
-        for i, url in enumerate(self.dropbox_datasets, 1):
-            try:
-                file_path = os.path.join(self.base_dir, f"CENSUS_PUB_20240509_{i}of3.csv")
-                print(f"Downloading CENSUS_PUB_20240509_{i}of3.csv")
-                response = requests.get(url)
-                response.raise_for_status()
-                with open(file_path, 'wb') as f:
-                    f.write(response.content)
-            except requests.RequestException as e:
-                raise APIError(f"Error downloading CENSUS_PUB_20240509_{i}of3.csv: {str(e)}")
+    async def download_datasets(self):
+        results = []
+        os.makedirs(self.base_dir, exist_ok=True)
+        async with FileManager(self.base_dir) as fm:
+            for url in self.dropbox_datasets:
+                try:
+                    filename = os.path.basename(url.split('?')[0])
+                    file_path = os.path.join(self.base_dir, filename)
+                    
+                    remote_date = self._extract_date_from_filename(filename)
+                    if os.path.exists(file_path):
+                        local_date = self._extract_date_from_filename(os.path.basename(file_path))
+                        if remote_date and local_date and remote_date <= local_date:
+                            self.logger.info(f"No update needed for {filename}")
+                            results.append((url, False))
+                            continue
+
+                    self.logger.info(f"Downloading {filename}")
+                    await fm._download_with_progress(url, file_path)
+                    results.append((url, True))
+                except APIError as e:
+                    self.logger.error(f"Error downloading {filename}: {str(e)}")
+                    results.append((url, False))
+        return results
+
+    def _extract_date_from_filename(self, filename):
+        try:
+            if 'CENSUS_PUB_' in filename:
+                date_str = filename.split('_')[2].split('.')[0]
+                return datetime.strptime(date_str, '%Y%m%d')
+            else:
+                self.logger.warning(f"Unexpected filename format: {filename}")
+                return None
+        except (ValueError, IndexError) as e:
+            self.logger.warning(f"Error extracting date from filename {filename}: {str(e)}")
+            return None
