@@ -45,7 +45,6 @@ class SMSUpdater:
 
             local_files = [f for f in os.listdir(local_dir) if f.endswith('.zip')]
             if not local_files:
-<<<<<<< HEAD
                 self.logger.info("No local SMS file found")
             elif latest_file == max(local_files, key=lambda f: self._extract_date_from_filename(f)):
                 self.logger.info(f"No update needed for SMS file")
@@ -54,18 +53,11 @@ class SMSUpdater:
             self.logger.info(f"Latest SMS file found on server: {latest_file}")
             for old_file in local_files:
                 os.remove(os.path.join(local_dir, old_file))
-=======
-                self.logger.info("Local SMS file not found")
-            elif latest_file == max(local_files, key=lambda f: self._extract_date_from_filename(f)):
-                self.logger.info(f"No update needed for SMS file")
-                return False
->>>>>>> b81253eb88dee5ce54c2e351a1c576488ca17f6d
 
             self.logger.info(f"Latest SMS file found on server: {latest_file}")
             url = urljoin(self.base_url, latest_file)
             local_path = os.path.join(local_dir, latest_file)
             self.logger.info(f"Downloading {latest_file}")
-<<<<<<< HEAD
             success = await self._download_with_progress(url, local_path)
             if not success:
                 self.logger.error(f"Failed to download {latest_file}")
@@ -77,14 +69,6 @@ class SMSUpdater:
             async with self.session.get(url) as response:
                 if response.status != 200:
                     return False
-=======
-            await self._download_with_progress(url, local_path)
-            return True
-
-    async def _download_with_progress(self, url, local_path):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
->>>>>>> b81253eb88dee5ce54c2e351a1c576488ca17f6d
                 total_size = int(response.headers.get('Content-Length', 0))
                 block_size = 1024 * 1024  # 1 MB
                 downloaded_size = 0
@@ -96,7 +80,6 @@ class SMSUpdater:
                         downloaded_size += size
                         f.write(data)
                         
-<<<<<<< HEAD
                         elapsed_time = max(time.time() - start_time, 0.1)  # Avoid division by zero
                         speed = downloaded_size / (1024 * 1024 * elapsed_time)
                         progress = f"INFO - {os.path.basename(local_path)}: {downloaded_size / (1024 * 1024):.1f}MiB [{elapsed_time:.1f}s, {speed:.2f}MiB/s]"
@@ -108,18 +91,6 @@ class SMSUpdater:
         except Exception as e:
             self.logger.error(f"Error downloading {url}: {str(e)}")
             return False
-=======
-                        elapsed_time = time.time() - start_time
-                        speed = downloaded_size / (1024 * 1024 * elapsed_time)
-                        progress = f"{os.path.basename(local_path)}: {downloaded_size / (1024 * 1024):.1f}MiB [{elapsed_time:.0f}s, {speed:.2f}MiB/s]"
-                        print(f"\r{progress}", end="", flush=True)
-                
-                print()  # New line after download completes
-                if total_size != 0 and downloaded_size != total_size:
-                    self.logger.error("ERROR, something went wrong")
-                else:
-                    self.logger.info(f"Successfully downloaded {url}")
->>>>>>> b81253eb88dee5ce54c2e351a1c576488ca17f6d
 
     async def _find_latest_sms_file(self):
         current_date = datetime.now()
@@ -150,10 +121,6 @@ class SMSUpdater:
                     if is_zip:
                         with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_file:
                             temp_file.write(await response.read())
-<<<<<<< HEAD
-=======
-                            temp_file_path = temp_file.name
->>>>>>> b81253eb88dee5ce54c2e351a1c576488ca17f6d
                         return filename
             return None
         except Exception as e:
@@ -167,7 +134,6 @@ class SMSUpdater:
         except (ValueError, IndexError) as e:
             self.logger.warning(f"Error extracting date from filename {filename}: {str(e)}")
             return None
-<<<<<<< HEAD
 
     async def test_connection(self):
         test_url = self.base_url
@@ -177,5 +143,3 @@ class SMSUpdater:
                     self.logger.warning(f"Connection test to {test_url} returned status code: {response.status}")
         except Exception as e:
             self.logger.error(f"Error testing connection to {test_url}: {str(e)}")
-=======
->>>>>>> b81253eb88dee5ce54c2e351a1c576488ca17f6d
