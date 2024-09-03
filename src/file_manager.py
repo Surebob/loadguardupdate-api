@@ -13,7 +13,8 @@ class FileManager:
         self.session = None
 
     async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
+        timeout = aiohttp.ClientTimeout(total=None, connect=60, sock_read=3600)  # Increased timeout
+        self.session = aiohttp.ClientSession(timeout=timeout)
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
@@ -61,5 +62,9 @@ class FileManager:
 
                 print(f"\n{filename}: Download complete")
 
+        except asyncio.TimeoutError:
+            print(f"\n{filename}: Download timed out. The download is taking longer than expected.")
+            raise APIError(f"Timeout error while downloading {url}")
         except aiohttp.ClientError as e:
+            print(f"\n{filename}: Download failed")
             raise APIError(f"Failed to download {url}: {str(e)}")
