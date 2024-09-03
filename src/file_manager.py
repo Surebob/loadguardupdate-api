@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 import asyncio
@@ -5,12 +6,15 @@ import aiohttp
 import aiofiles
 from datetime import datetime
 from src.error_handler import FileError, APIError
+from ftplib import FTP
+from urllib.parse import urlparse
 
 class FileManager:
     def __init__(self, base_dir, max_concurrent_downloads=5):
         self.base_dir = base_dir
         self.semaphore = asyncio.Semaphore(max_concurrent_downloads)
         self.session = None
+        self.logger = logging.getLogger(__name__)
 
     async def __aenter__(self):
         timeout = aiohttp.ClientTimeout(total=None, connect=60, sock_read=3600)  # Increased timeout
@@ -21,24 +25,12 @@ class FileManager:
         if self.session:
             await self.session.close()
 
-    async def read_metadata(self, dataset_name):
-        try:
-            metadata_file = os.path.join(self.base_dir, dataset_name, f"{dataset_name}_metadata.json")
-            if os.path.exists(metadata_file):
-                async with aiofiles.open(metadata_file, 'r') as f:
-                    return json.loads(await f.read())
-            return None
-        except Exception as e:
-            raise FileError(f"Failed to read metadata for dataset {dataset_name}: {str(e)}")
-
-    async def save_metadata(self, dataset_name, metadata):
-        try:
-            metadata_file = os.path.join(self.base_dir, dataset_name, f"{dataset_name}_metadata.json")
-            
-            async with aiofiles.open(metadata_file, 'w') as f:
-                await f.write(json.dumps(metadata, indent=2))
-        except Exception as e:
-            raise FileError(f"Failed to save metadata for dataset {dataset_name}: {str(e)}")
+    async def download_file(self, url, local_path):
+        parsed_url = urlparse(url)
+        if parsed_url.scheme == 'ftp':
+            await self._download_ftp(parsed_url, local_path)
+        else:
+            await self._download_with_progress(url, local_path)
 
     async def _download_with_progress(self, url, file_path):
         try:
@@ -51,8 +43,10 @@ class FileManager:
                 filename = os.path.basename(file_path)
                 print(f"{filename}: Starting download")
 
+                chunk_size = 8 * 1024 * 1024  # 8 MB chunks
+
                 async with aiofiles.open(file_path, 'wb') as f:
-                    async for chunk in response.content.iter_chunked(8192):
+                    async for chunk in response.content.iter_chunked(chunk_size):
                         await f.write(chunk)
                         downloaded_size += len(chunk)
                         elapsed_time = (datetime.now() - start_time).total_seconds()
