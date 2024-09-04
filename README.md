@@ -1,29 +1,30 @@
-# KNIME-Socrata Integration
+# LoadGuard KNIME-Socrata Integration System
 
-This project integrates Socrata datasets with KNIME workflows, providing automated data updates and processing.
+This project integrates Socrata datasets, FTP sources, and Dropbox files with KNIME workflows, providing automated data updates and processing for transportation-related data.
 
 ## Features
 
 - Automated checking and downloading of Socrata datasets
-- File integrity checks and efficient storage
+- Handling of FTP and HTTP file downloads
+- Integration with Dropbox for additional data sources
+- SMS (Safety Measurement System) data updates
 - KNIME workflow execution in batch mode
-- Error handling and comprehensive logging
+- Comprehensive error handling and logging
+- Scheduled updates and processing
 
 ## System Architecture
 
-![KNIME-Socrata Integration System](https://github.com/Load-Guard/LoadGuard-KNIME-Socrata-Integration-System/blob/main/assets/LoadGuard_Knime.png)
-
 The system consists of the following main components:
 
-1. **Socrata API**: External data source providing access to various datasets.
-3. **DataProcessor**: Orchestrates data processing, determining if datasets need updating.
-4. **FileManager**: Manages local file operations, saving and updating dataset files.
-5. **KNIME Runner**: Executes KNIME workflows with updated dataset information.
-6. **KNIME Workflow**: Processes the updated data, performing analysis and transformations.
-7. **run_update.py**: Scheduled script that checks for updates and triggers the data processing pipeline.
-8. **run_knime_workflow.py**: Script for manual execution of KNIME workflows with custom parameters.
-9. **Error Handler**: Manages errors across all components, ensuring robust error handling and reporting.
-10. **Logging**: Comprehensive logging system tracking all operations, updates, and errors.
+1. **Socrata API**: External data source providing access to various transportation datasets.
+2. **FTP and HTTP Sources**: Additional data sources for specific files.
+3. **Dropbox Integration**: Fetches census-related datasets.
+4. **SMS Updater**: Handles Safety Measurement System data updates.
+5. **File Manager**: Manages local file operations, downloading, and updating dataset files.
+6. **KNIME Runner**: Executes KNIME workflows with updated dataset information.
+7. **Data Processor**: Orchestrates the entire data processing pipeline.
+8. **Error Handler**: Manages errors across all components, ensuring robust error handling and reporting.
+9. **Logging System**: Comprehensive logging tracking all operations, updates, and errors.
 
 ## Setup
 
@@ -32,18 +33,32 @@ The system consists of the following main components:
 3. Configure settings in `config/settings.py`
 4. Ensure KNIME is installed and the path is correctly set in the configuration
 
+## Configuration
+
+Key configuration settings in `config/settings.py`:
+
+- `BASE_DIR`: Base directory of the project
+- `DATA_DIR`: Directory to store downloaded data
+- `KNIME_EXECUTABLE`: Path to KNIME executable
+- `KNIME_WORKFLOW_DIR`: Directory containing KNIME workflows
+- `DATASET_UPDATE_INTERVAL`: Interval for checking dataset updates
+- `KNIME_WORKFLOW_TIME`: Daily time to run KNIME workflow
+- `DATASET_NAMES` and `DATASET_URLS`: List of datasets and their Socrata API URLs
+- `ZIP_FILES`: Additional ZIP file sources
+- `DROPBOX_DATASETS`: URLs for Dropbox datasets
+
 ## Usage
 
-To run the automated update process: 
+To run the automated update process:
 
 ```
-python scripts/run_update.py
+python main_scripts/run_update.py
 ```
 
 To manually run a KNIME workflow: 
 
 ```
-python scripts/run_knime_workflow.py
+python main_scripts/knime_runner.py
 ```
 
 ## Project Structure

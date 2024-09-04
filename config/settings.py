@@ -11,15 +11,14 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 KNIME_EXECUTABLE = "C:/Program Files/KNIME/knime.exe"
 KNIME_WORKFLOW_DIR = "A:/knime-workspace/TEST_WORKFLOW"
 
-# Schedule settings
-SCHEDULE_TIME = "02:00"  # 2 AM
+# Timezone
 TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
 
-# Update interval in hours
-CHECK_INTERVAL_HOURS = 1
+# Dataset update interval in minutes
+DATASET_UPDATE_INTERVAL = 60  # Check every 60 minutes
 
-# Update interval in minutes
-UPDATE_INTERVAL_MINUTES = 60  # Add this line
+# KNIME workflow schedule
+KNIME_WORKFLOW_TIME = "02:00"  # Run KNIME workflow at 2 AM
 
 # Logging configuration
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')

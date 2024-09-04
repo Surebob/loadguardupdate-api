@@ -8,14 +8,6 @@ from src.error_handler import APIError
 from src.file_manager import FileManager
 from config.settings import DATASET_URLS
 
-# Configure logging to print to console and write to a file
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    handlers=[
-                        logging.FileHandler("socrata_api.log"),
-                        logging.StreamHandler(sys.stdout)
-                    ])
-
 class SocrataAPI:
     def __init__(self, base_dir):
         self.datasets = DATASET_URLS
