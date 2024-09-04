@@ -6,7 +6,6 @@ from ftplib import FTP
 from datetime import datetime
 from src.error_handler import APIError
 from src.file_manager import FileManager
-from src.file_downloader import FileDownloader
 from config.settings import ZIP_FILES
 from src.sms_update import SMSUpdater
 
@@ -15,24 +14,24 @@ class ZipFileHandler:
         self.base_dir = base_dir
         self.logger = logging.getLogger(__name__)
         self.zip_files = ZIP_FILES
-        self.file_downloader = FileDownloader(base_dir)
+        self.file_manager = FileManager(base_dir)
         self.sms_updater = SMSUpdater(base_dir, "https://ai.fmcsa.dot.gov/SMS/files/")
 
     async def download_all(self):
         results = []
-        async with FileManager(self.base_dir) as fm:
+        async with self.file_manager:
             for url in self.zip_files:
                 parsed_url = urlparse(url)
                 if parsed_url.scheme == 'ftp':
-                    result = await self._handle_ftp(parsed_url, fm)
+                    result = await self._handle_ftp(parsed_url)
                 elif 'ai.fmcsa.dot.gov/SMS/files' in url:
                     result = await self.sms_updater.check_and_download_latest()
                 else:
-                    result = await self._handle_http(url, fm)
+                    result = await self._handle_http(url)
                 results.append((url, result))
         return results
 
-    async def _handle_ftp(self, parsed_url, fm):
+    async def _handle_ftp(self, parsed_url):
         ftp_dir = parsed_url.path
         remote_files = await self._list_ftp_files(parsed_url)
         if not remote_files:
@@ -78,7 +77,7 @@ class ZipFileHandler:
 
         return len(updates) > 0
 
-    async def _handle_http(self, url, fm):
+    async def _handle_http(self, url):
         parsed_url = urlparse(url)
         remote_filename = os.path.basename(parsed_url.path)
         
@@ -91,7 +90,7 @@ class ZipFileHandler:
         os.makedirs(local_dir, exist_ok=True)
         local_path = os.path.join(local_dir, remote_filename)
         self.logger.info(f"Downloading {remote_filename} to {local_path}")
-        await fm._download_with_progress(url, local_path)
+        await self.file_manager.download_file(url, local_path)
         self.logger.info(f"Downloaded {remote_filename} to {dataset_name} directory")
         return True
 
@@ -120,7 +119,13 @@ class ZipFileHandler:
         remote_path = f"{parsed_url.path}/{filename}"
         local_path = os.path.join(local_dir, filename)
         full_url = parsed_url._replace(path=remote_path).geturl()
-        await self.file_downloader.check_and_download(full_url, local_path)
+        try:
+            await self.file_manager.download_file(full_url, local_path)
+        except APIError as e:
+            self.logger.error(f"Failed to download {filename}: {str(e)}")
+            if os.path.exists(local_path):
+                os.remove(local_path)
+            raise
 
     def _extract_date_from_filename(self, filename):
         try:

@@ -5,7 +5,6 @@ import aiohttp
 import ssl
 import asyncio
 from urllib.parse import urljoin
-from src.file_downloader import FileDownloader
 import traceback
 import tempfile
 import time
@@ -15,7 +14,6 @@ class SMSUpdater:
         self.base_dir = base_dir
         self.base_url = base_url
         self.logger = logging.getLogger(__name__)
-        self.file_downloader = FileDownloader(base_dir)
         self.session = None
 
     async def __aenter__(self):

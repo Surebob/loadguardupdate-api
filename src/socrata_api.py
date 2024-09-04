@@ -63,12 +63,18 @@ class SocrataAPI:
                         self.logger.info(f"New update found for {dataset_name}. Downloading dataset.")
                         download_url = f"{url}/rows.csv?accessType=DOWNLOAD&api_foundry=true"
                         file_path = os.path.join(dataset_dir, f"{dataset_name}.csv")
-                        await fm._download_with_progress(download_url, file_path)
-                        await fm.save_metadata(dataset_name, {
-                            'rowsUpdatedAt': rows_updated_at.isoformat()
-                        })
-                        self.logger.info(f"Dataset {dataset_name} updated successfully.")
-                        any_updates = True
+                        try:
+                            await fm._download_with_progress(download_url, file_path)
+                            await fm.save_metadata(dataset_name, {
+                                'rowsUpdatedAt': rows_updated_at.isoformat()
+                            })
+                            self.logger.info(f"Dataset {dataset_name} updated successfully.")
+                            any_updates = True
+                        except APIError as download_error:
+                            self.logger.error(f"Failed to download {dataset_name}: {str(download_error)}")
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                            continue
                     else:
                         self.logger.info(f"No updates for dataset {dataset_name}.")
                 except APIError as e:
