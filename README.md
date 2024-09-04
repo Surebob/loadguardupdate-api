@@ -7,7 +7,7 @@ This project integrates Socrata datasets, FTP sources, and Dropbox files with KN
 - Automated checking and downloading of Socrata datasets
 - Handling of FTP and HTTP file downloads
 - Integration with Dropbox for additional data sources
-- SMS (Safety Measurement System) data updates
+- Determination of SMS (Safety Measurement System) latest file
 - KNIME workflow execution in batch mode
 - Comprehensive error handling and logging
 - Scheduled updates and processing
@@ -19,7 +19,7 @@ The system consists of the following main components:
 1. **Socrata API**: External data source providing access to various transportation datasets.
 2. **FTP and HTTP Sources**: Additional data sources for specific files.
 3. **Dropbox Integration**: Fetches census-related datasets.
-4. **SMS Updater**: Handles Safety Measurement System data updates.
+4. **SMS Updater**: finds the latest Safety Measurement System data updates by probing SMS URL.
 5. **File Manager**: Manages local file operations, downloading, and updating dataset files.
 6. **KNIME Runner**: Executes KNIME workflows with updated dataset information.
 7. **Data Processor**: Orchestrates the entire data processing pipeline.
@@ -31,7 +31,7 @@ The system consists of the following main components:
 1. Clone this repository
 2. Install dependencies: `pip install -r requirements.txt`
 3. Configure settings in `config/settings.py`
-4. Ensure KNIME is installed and the path is correctly set in the configuration
+4. Ensure KNIME is installed and the path is correctly set in the configuration (workflow directory needs to be set to the KNIME workspace directory, can not be an exported workflow filee)
 
 ## Configuration
 
@@ -65,11 +65,9 @@ python main_scripts/knime_runner.py
 
 - `src/`: Core functionality modules
 - `config/`: Configuration files
-- `scripts/`: Execution scripts
-- `tests/`: Unit tests
+- `main_scripts/`: Execution scripts
 - `logs/`: Log files (generated during runtime)
 - `data/`: Downloaded datasets (generated during runtime)
-- `knime_workflows/`: KNIME workflow files
 
 ## Development
 
