@@ -9,7 +9,8 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # KNIME settings
 KNIME_EXECUTABLE = "C:/Program Files/KNIME/knime.exe"
-KNIME_WORKFLOW_DIR = "A:/knime-workspace/TEST_WORKFLOW"
+# Only use in Windows
+# KNIME_WORKFLOW_DIR = "A:/knime-workspace/TEST_WORKFLOW"
 
 # Timezone
 TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
