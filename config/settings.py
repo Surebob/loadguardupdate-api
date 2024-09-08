@@ -19,7 +19,7 @@ TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
 DATASET_UPDATE_INTERVAL = 60  # Check every 60 minutes
 
 # KNIME workflow schedule
-KNIME_WORKFLOW_TIME = "04:05"  # Run KNIME workflow at N AM/PM
+KNIME_WORKFLOW_TIME = "01:05"  # Run KNIME workflow at N AM/PM
 
 # Logging configuration
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')
