@@ -1,7 +1,7 @@
 import os
 import pytz
 
-# Base directory of the project
+# Base directory of the projectq
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Directory to store downloaded data
