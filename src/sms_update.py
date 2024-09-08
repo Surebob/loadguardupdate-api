@@ -52,7 +52,6 @@ class SMSUpdater:
             for old_file in local_files:
                 os.remove(os.path.join(local_dir, old_file))
 
-            self.logger.info(f"Latest SMS file found on server: {latest_file}")
             url = urljoin(self.base_url, latest_file)
             local_path = os.path.join(local_dir, latest_file)
             self.logger.info(f"Downloading {latest_file}")

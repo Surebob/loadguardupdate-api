@@ -8,9 +8,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # KNIME settings
-KNIME_EXECUTABLE = "C:/Program Files/KNIME/knime.exe"
+KNIME_EXECUTABLE = r"D:\knime\knime.exe"
 # Only use in Windows
-KNIME_WORKFLOW_DIR = "A:/knime-workspace/TEST_WORKFLOW"
+KNIME_WORKFLOW_DIR = r"D:\Users\loadguard\knime-workspace\LoadGuard_Data_Workflow"
 
 # Timezone
 TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
@@ -19,7 +19,7 @@ TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
 DATASET_UPDATE_INTERVAL = 60  # Check every 60 minutes
 
 # KNIME workflow schedule
-KNIME_WORKFLOW_TIME = "02:00"  # Run KNIME workflow at 2 AM
+KNIME_WORKFLOW_TIME = "04:05"  # Run KNIME workflow at N AM/PM
 
 # Logging configuration
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')

@@ -62,6 +62,14 @@ def run_dataset_update():
 def run_knime_job():
     asyncio.run(run_knime_workflow())
 
+def format_time_until_knime(seconds):
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    if hours > 0:
+        return f"{hours:.0f} hours and {minutes:.0f} minutes"
+    else:
+        return f"{minutes:.0f} minutes"
+
 def main():
     logger.info("Starting the update process")
 
@@ -77,18 +85,35 @@ def main():
     # Run dataset update immediately on startup
     run_dataset_update()
 
+    last_knime_log_time = datetime.now(TIMEZONE) - timedelta(minutes=30)
+
     while True:
+        now = datetime.now(TIMEZONE)
+        
+        # Check if it's time to run scheduled jobs
         schedule.run_pending()
         
-        # Sleep until the next scheduled job
-        time_until_next_job = schedule.idle_seconds()
-        if time_until_next_job is None:
-            time_until_next_job = 60  # Default to 60 seconds if no jobs are scheduled
-        else:
-            time_until_next_job = min(time_until_next_job, 3600)  # Cap at 1 hour
-        
-        logger.info(f"Sleeping for {time_until_next_job / 60:.2f} minutes until next job")
-        time.sleep(time_until_next_job)
+        # Calculate time until next KNIME run
+        knime_time = datetime.strptime(KNIME_WORKFLOW_TIME, "%H:%M").time()
+        next_knime_run = TIMEZONE.localize(datetime.combine(now.date(), knime_time))
+        if next_knime_run <= now:
+            next_knime_run += timedelta(days=1)
+        time_until_knime = (next_knime_run - now).total_seconds()
+
+        # Log KNIME update time every 30 minutes
+        if (now - last_knime_log_time).total_seconds() >= 1800:  # 30 minutes
+            knime_time_str = format_time_until_knime(time_until_knime)
+            logger.info(f"KNIME Update Workflow will run in {knime_time_str}")
+            last_knime_log_time = now
+
+        # Calculate time until next dataset update
+        next_dataset_update = schedule.next_run()
+        time_until_dataset_update = (next_dataset_update - now).total_seconds()
+
+        # Sleep until the next event (dataset update or KNIME run)
+        sleep_time = min(time_until_dataset_update, time_until_knime, 60)  # Max sleep of 60 seconds
+        logger.info(f"Sleeping for {sleep_time:.2f} seconds until next check")
+        time.sleep(sleep_time)
 
 if __name__ == "__main__":
     try:
