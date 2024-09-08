@@ -15,11 +15,14 @@ KNIME_WORKFLOW_DIR = r"D:\Users\loadguard\knime-workspace\LoadGuard_Data_Workflo
 # Timezone
 TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
 
-# Dataset update interval in minutes
-DATASET_UPDATE_INTERVAL = 60  # Check every 60 minutes
+# Check interval in minutes
+CHECK_INTERVAL = 30  # Check every 30 minutes
+
+# Dataset update interval in hours
+DATASET_UPDATE_INTERVAL = 3  # Update datasets every 3 hours
 
 # KNIME workflow schedule
-KNIME_WORKFLOW_TIME = "01:05"  # Run KNIME workflow at N AM/PM
+KNIME_WORKFLOW_TIME = "12:08"  # Run KNIME workflow at 12:05 PM
 
 # Logging configuration
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')

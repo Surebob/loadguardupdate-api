@@ -12,7 +12,7 @@ from main_scripts.knime_runner import KNIMERunner
 from src.zip_file_handler import ZipFileHandler
 from src.dropbox_handler import DropboxHandler
 from config.settings import (KNIME_EXECUTABLE, DATA_DIR, TIMEZONE,
-                             DATASET_UPDATE_INTERVAL, KNIME_WORKFLOW_TIME)
+                             DATASET_UPDATE_INTERVAL, KNIME_WORKFLOW_TIME, CHECK_INTERVAL)
 from src.error_handler import KNIMEError, APIError
 from config.logging_config import configure_logging
 import logging
@@ -53,8 +53,10 @@ async def run_knime_workflow():
     try:
         await knime_runner.run_workflow()
         logger.info("KNIME workflow executed successfully")
+        return True
     except KNIMEError as e:
         logger.error(f"Error running KNIME workflow: {str(e)}")
+        return False
 
 def run_dataset_update():
     asyncio.run(update_datasets())
@@ -70,50 +72,84 @@ def format_time_until_knime(seconds):
     else:
         return f"{minutes:.0f} minutes"
 
+def format_sleep_time(seconds):
+    if seconds < 60:
+        return f"{seconds:.0f} seconds"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        remaining_seconds = int(seconds % 60)
+        if remaining_seconds == 0:
+            return f"{minutes} minutes"
+        else:
+            return f"{minutes} minutes and {remaining_seconds} seconds"
+    else:
+        hours = int(seconds // 3600)
+        remaining_minutes = int((seconds % 3600) // 60)
+        if remaining_minutes == 0:
+            return f"{hours} hours"
+        else:
+            return f"{hours} hours and {remaining_minutes} minutes"
+
 def main():
     logger.info("Starting the update process")
-
-    # Schedule dataset updates
-    schedule.every(DATASET_UPDATE_INTERVAL).minutes.do(run_dataset_update)
-
-    # Schedule KNIME workflow
-    schedule.every().day.at(KNIME_WORKFLOW_TIME).do(run_knime_job)
-
-    logger.info(f"Dataset updates scheduled every {DATASET_UPDATE_INTERVAL} minutes")
-    logger.info(f"KNIME workflow scheduled daily at {KNIME_WORKFLOW_TIME}")
 
     # Run dataset update immediately on startup
     run_dataset_update()
 
-    last_knime_log_time = datetime.now(TIMEZONE) - timedelta(minutes=30)
+    last_update_time = datetime.now(TIMEZONE)
+    last_check_time = last_update_time
+    last_knime_log_time = last_update_time - timedelta(minutes=30)
+    last_knime_run_date = last_update_time.date() - timedelta(days=1)  # Ensure it runs on first day
+    knime_retry_time = None
 
     while True:
         now = datetime.now(TIMEZONE)
         
-        # Check if it's time to run scheduled jobs
-        schedule.run_pending()
-        
-        # Calculate time until next KNIME run
+        # Check if it's time for dataset update (every 3 hours)
+        if (now - last_update_time).total_seconds() >= DATASET_UPDATE_INTERVAL * 3600:
+            run_dataset_update()
+            last_update_time = now
+            logger.info("Dataset update completed")
+
+        # Check if it's time for KNIME workflow
         knime_time = datetime.strptime(KNIME_WORKFLOW_TIME, "%H:%M").time()
-        next_knime_run = TIMEZONE.localize(datetime.combine(now.date(), knime_time))
+        knime_datetime = TIMEZONE.localize(datetime.combine(now.date(), knime_time))
+        
+        if (now.date() > last_knime_run_date and now >= knime_datetime) or (knime_retry_time and now >= knime_retry_time):
+            knime_success = asyncio.run(run_knime_workflow())
+            if knime_success:
+                logger.info("KNIME workflow executed successfully")
+                last_knime_run_date = now.date()
+                knime_retry_time = None
+            else:
+                logger.warning("KNIME workflow failed. Will retry in 5 minutes.")
+                knime_retry_time = now + timedelta(minutes=5)
+
+        # Calculate time until next KNIME run
+        next_knime_run = knime_datetime
         if next_knime_run <= now:
             next_knime_run += timedelta(days=1)
         time_until_knime = (next_knime_run - now).total_seconds()
 
         # Log KNIME update time every 30 minutes
         if (now - last_knime_log_time).total_seconds() >= 1800:  # 30 minutes
-            knime_time_str = format_time_until_knime(time_until_knime)
+            knime_time_str = format_sleep_time(time_until_knime)
             logger.info(f"KNIME Update Workflow will run in {knime_time_str}")
             last_knime_log_time = now
 
-        # Calculate time until next dataset update
-        next_dataset_update = schedule.next_run()
-        time_until_dataset_update = (next_dataset_update - now).total_seconds()
+        # Calculate time until next check
+        time_until_next_check = CHECK_INTERVAL * 60 - (now - last_check_time).total_seconds()
 
-        # Sleep until the next event (dataset update or KNIME run)
-        sleep_time = min(time_until_dataset_update, time_until_knime, 60)  # Max sleep of 60 seconds
-        logger.info(f"Sleeping for {sleep_time:.2f} seconds until next check")
+        # Calculate time until KNIME retry if applicable
+        time_until_knime_retry = (knime_retry_time - now).total_seconds() if knime_retry_time else float('inf')
+
+        # Sleep until the next event (check, KNIME run, or KNIME retry)
+        sleep_time = max(0, min(time_until_next_check, time_until_knime, time_until_knime_retry))
+        formatted_sleep_time = format_sleep_time(sleep_time)
+        logger.info(f"Sleeping for {formatted_sleep_time} until next check")
         time.sleep(sleep_time)
+
+        last_check_time = now
 
 if __name__ == "__main__":
     try:
