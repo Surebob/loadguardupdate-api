@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import subprocess
 import asyncio
 from src.error_handler import KNIMEError
-from config.settings import KNIME_WORKFLOW_DIR, KNIME_EXECUTABLE, BASE_DIR
+from config.settings import KNIME_WORKFLOW_DIR, BASE_DIR
 import logging
 from datetime import datetime
 
@@ -16,15 +16,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 class KNIMERunner:
-    def __init__(self, knime_executable):
-        self.knime_executable = knime_executable
+    def __init__(self):
         self.log_dir = os.path.join(BASE_DIR, 'logs')
         os.makedirs(self.log_dir, exist_ok=True)
 
     async def run_workflow(self):
         try:
             command = [
-                self.knime_executable,
+                "knime",
                 "-reset",
                 "-nosplash",
                 "-application", "org.knime.product.KNIME_BATCH_APPLICATION",
@@ -45,8 +44,7 @@ class KNIMERunner:
                 process = await asyncio.create_subprocess_exec(
                     *command,
                     stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+                    stderr=asyncio.subprocess.PIPE
                 )
 
                 async def log_stream(stream):
@@ -82,7 +80,7 @@ class KNIMERunner:
             raise KNIMEError(error_message)
 
 async def main():
-    runner = KNIMERunner(KNIME_EXECUTABLE)
+    runner = KNIMERunner()
     try:
         await runner.run_workflow()
     except KNIMEError as e:
