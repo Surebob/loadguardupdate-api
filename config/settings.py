@@ -23,6 +23,9 @@ DATASET_UPDATE_TIME = "23:40"  # Set to desired time, e.g., 11:30 PM
 # KNIME workflow schedule time in "HH:MM" 24-hour format
 KNIME_WORKFLOW_TIME = "23:45"  # Set to desired time, e.g., 12:08 PM
 
+# Maximum number of retries for KNIME workflow
+MAX_KNIME_RETRIES = 5  # Adjust as needed
+
 # Logging configuration
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')
 LOG_LEVEL = 'INFO'

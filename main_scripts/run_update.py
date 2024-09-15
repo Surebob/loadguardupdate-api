@@ -18,17 +18,25 @@ from config.settings import (
     TIMEZONE,
     DATASET_UPDATE_TIME,
     KNIME_WORKFLOW_TIME,
+    MAX_KNIME_RETRIES  # Imported from settings.py
 )
-from src.error_handler import KNIMEError, APIError
+from src.error_handler import KNIMEError
 from config.logging_config import configure_logging
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.events import EVENT_JOB_ERROR
 
 configure_logging()
 logger = logging.getLogger(__name__)
+
+# Global scheduler variable
+scheduler = None
+
+# KNIME retry counter
+knime_retry_count = 0
 
 async def update_datasets():
     logger.info("Starting dataset update")
@@ -58,29 +66,41 @@ async def update_datasets():
         logger.info("No updates found for datasets")
 
 async def run_knime_workflow():
+    global knime_retry_count
     logger.info("Starting KNIME workflow")
     knime_runner = KNIMERunner(KNIME_EXECUTABLE)
     try:
         await knime_runner.run_workflow()
         logger.info("KNIME workflow executed successfully")
+        knime_retry_count = 0  # Reset the counter on success
     except KNIMEError as e:
         logger.error(f"Error running KNIME workflow: {str(e)}")
-        logger.warning("KNIME workflow failed. Will retry in 5 minutes.")
-        await schedule_knime_retry()
+        if knime_retry_count < MAX_KNIME_RETRIES:
+            knime_retry_count += 1
+            logger.warning(f"KNIME workflow failed. Will retry in 5 minutes. Retry {knime_retry_count}/{MAX_KNIME_RETRIES}.")
+            await schedule_knime_retry()
+        else:
+            logger.critical("Maximum KNIME workflow retries reached. No further retries will be scheduled.")
 
 async def schedule_knime_retry():
     retry_time = datetime.now(TIMEZONE) + timedelta(minutes=5)
     logger.info(f"Scheduling KNIME workflow retry at {retry_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+    # Use the global scheduler
     scheduler.add_job(
         run_knime_workflow,
         DateTrigger(run_date=retry_time),
         id='knime_retry',
         replace_existing=True,
     )
-    scheduler.start()
+
+def job_error_listener(event):
+    if event.exception:
+        logger.error(f"Job {event.job_id} raised an exception: {event.exception}", exc_info=True)
+    else:
+        logger.info(f"Job {event.job_id} executed successfully")
 
 async def main():
+    global scheduler  # Declare that we are using the global variable
     logger.info("Starting the update process")
 
     # Run dataset update immediately on startup
@@ -88,6 +108,9 @@ async def main():
 
     # Initialize the scheduler with timezone awareness
     scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+
+    # Add the job error listener
+    scheduler.add_listener(job_error_listener, EVENT_JOB_ERROR)
 
     # Schedule the dataset updates at the specified time
     dataset_update_hour, dataset_update_minute = map(int, DATASET_UPDATE_TIME.split(":"))
@@ -116,7 +139,7 @@ async def main():
 
     # Keep the script running
     try:
-        await asyncio.Event().wait()  # This creates an event that never gets set, so it waits indefinitely
+        await asyncio.Event().wait()
     except (KeyboardInterrupt, SystemExit):
         logger.info("Scheduler stopped by user")
         scheduler.shutdown()
