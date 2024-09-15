@@ -8,9 +8,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # KNIME settings
-KNIME_EXECUTABLE = r"D:\knime\knime.exe"
+KNIME_EXECUTABLE = r"C:\KNIME\knime.exe"
 # Only use in Windows
-KNIME_WORKFLOW_DIR = r"D:\Users\loadguard\knime-workspace\LoadGuard_Data_Workflow"
+KNIME_WORKFLOW_DIR = r"C:\Users\Loadguard\knime-workspace\LoadGuard_Data_Workflow"
 
 # Timezone
 TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
