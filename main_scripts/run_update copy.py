@@ -6,8 +6,7 @@ import pytz
 import platform  # Import platform to check the operating system
 import signal
 import logging
-import time
-import threading
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.socrata_api import SocrataAPI
@@ -29,19 +28,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.events import EVENT_JOB_ERROR
-
-FLAG_FILE = "script_running.flag"
-
-# Global variable to control the flag file update loop
-keep_updating_flag = True
-
-async def update_flag_file():
-    global keep_updating_flag
-    while keep_updating_flag:
-        with open(FLAG_FILE, 'w') as f:
-            f.write(str(time.time()))
-        await asyncio.sleep(1)  # Update every second
-
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -119,62 +105,55 @@ def handle_shutdown():
         scheduler.shutdown()
 
 async def main():
-    global scheduler, keep_updating_flag
+    global scheduler  # Declare that we are using the global variable
     logger.info("Starting the update process")
 
-    # Start the flag file update task
-    flag_update_task = asyncio.create_task(update_flag_file())
-    
+    # Run dataset update immediately on startup
+    await update_datasets()
+
+    # Initialize the scheduler with timezone awareness
+    scheduler = AsyncIOScheduler(timezone=TIMEZONE)
+
+    # Add the job error listener
+    scheduler.add_listener(job_error_listener, EVENT_JOB_ERROR)
+
+    # Schedule the dataset updates at the specified time
+    dataset_update_hour, dataset_update_minute = map(int, DATASET_UPDATE_TIME.split(":"))
+    scheduler.add_job(
+        update_datasets,
+        CronTrigger(
+            hour=dataset_update_hour, minute=dataset_update_minute, timezone=TIMEZONE
+        ),
+        id='dataset_update',
+    )
+    logger.info(f"Scheduled dataset updates daily at {DATASET_UPDATE_TIME} {TIMEZONE}")
+
+    # Schedule the KNIME workflow at the specified time
+    knime_workflow_hour, knime_workflow_minute = map(int, KNIME_WORKFLOW_TIME.split(":"))
+    scheduler.add_job(
+        run_knime_workflow,
+        CronTrigger(
+            hour=knime_workflow_hour, minute=knime_workflow_minute, timezone=TIMEZONE
+        ),
+        id='knime_workflow',
+    )
+    logger.info(f"Scheduled KNIME workflow daily at {KNIME_WORKFLOW_TIME} {TIMEZONE}")
+
+    # Start the scheduler
+    scheduler.start()
+
+    # Setup signal handlers only on Unix-based systems
+    if platform.system() != "Windows":
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, handle_shutdown)
+
+    # Keep the script running
     try:
-        # Run dataset update immediately on startup
-        await update_datasets()
-
-        # Initialize the scheduler with timezone awareness
-        scheduler = AsyncIOScheduler(timezone=TIMEZONE)
-
-        # Add the job error listener
-        scheduler.add_listener(job_error_listener, EVENT_JOB_ERROR)
-
-        # Schedule the dataset updates at the specified time
-        dataset_update_hour, dataset_update_minute = map(int, DATASET_UPDATE_TIME.split(":"))
-        scheduler.add_job(
-            update_datasets,
-            CronTrigger(
-                hour=dataset_update_hour, minute=dataset_update_minute, timezone=TIMEZONE
-            ),
-            id='dataset_update',
-        )
-        logger.info(f"Scheduled dataset updates daily at {DATASET_UPDATE_TIME} {TIMEZONE}")
-
-        # Schedule the KNIME workflow at the specified time
-        knime_workflow_hour, knime_workflow_minute = map(int, KNIME_WORKFLOW_TIME.split(":"))
-        scheduler.add_job(
-            run_knime_workflow,
-            CronTrigger(
-                hour=knime_workflow_hour, minute=knime_workflow_minute, timezone=TIMEZONE
-            ),
-            id='knime_workflow',
-        )
-        logger.info(f"Scheduled KNIME workflow daily at {KNIME_WORKFLOW_TIME} {TIMEZONE}")
-
-        # Start the scheduler
-        scheduler.start()
-
-        # Setup signal handlers only on Unix-based systems
-        if platform.system() != "Windows":
-            loop = asyncio.get_event_loop()
-            for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, handle_shutdown)
-
-        # Keep the script running
         await asyncio.Event().wait()
     except (KeyboardInterrupt, SystemExit):
         logger.info("Scheduler stopped by user")
-        if scheduler:
-            scheduler.shutdown()
-    finally:
-        keep_updating_flag = False
-        await flag_update_task
+        scheduler.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())

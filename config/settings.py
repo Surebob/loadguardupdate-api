@@ -10,25 +10,24 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # KNIME settings
-KNIME_EXECUTABLE = r"C:\KNIME\knime.exe"
-# Only use in Windows
-KNIME_WORKFLOW_DIR = r"C:\Users\Loadguard\knime-workspace\LoadGuard_Data_Workflow"
+KNIME_EXECUTABLE = os.environ.get('KNIME_EXECUTABLE', r"C:\KNIME\knime.exe")
+KNIME_WORKFLOW_DIR = os.environ.get('KNIME_WORKFLOW_DIR', r"C:\Users\Loadguard\knime-workspace\LoadGuard_Data_Workflow")
 
 # Timezone
-TIMEZONE = pytz.timezone("America/Los_Angeles")  # PST
+TIMEZONE = pytz.timezone(os.environ.get('TIMEZONE', "America/Los_Angeles"))  # PST
 
 # Dataset update time in "HH:MM" 24-hour format
-DATASET_UPDATE_TIME = "23:40"  # Set to desired time, e.g., 11:30 PM
+DATASET_UPDATE_TIME = os.environ.get('DATASET_UPDATE_TIME', "23:00")  # Set to desired time
 
 # KNIME workflow schedule time in "HH:MM" 24-hour format
-KNIME_WORKFLOW_TIME = "23:45"  # Set to desired time, e.g., 12:08 PM
+KNIME_WORKFLOW_TIME = os.environ.get('KNIME_WORKFLOW_TIME', "23:30")  # Set to desired time
 
 # Maximum number of retries for KNIME workflow
-MAX_KNIME_RETRIES = 5  # Adjust as needed
+MAX_KNIME_RETRIES = int(os.environ.get('MAX_KNIME_RETRIES', 5))
 
 # Logging configuration
 LOG_FILE = os.path.join(BASE_DIR, 'logs', 'application.log')
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
 # Dataset configurations
 DATASET_NAMES = [
@@ -56,8 +55,8 @@ DATASET_URLS = {
 
 # ZIP files to download
 ZIP_FILES = [
-    "ftp://ftp.senture.com",
-    "https://ai.fmcsa.dot.gov/SMS/files"  # Make sure this URL is correct
+    "ftp://ftp.senture.com/",
+    "https://ai.fmcsa.dot.gov/SMS/files/"
 ]
 
 # Dropbox dataset URLs

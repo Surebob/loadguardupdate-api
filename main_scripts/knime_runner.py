@@ -1,23 +1,24 @@
+# knime_runner.py
 import sys
 import os
+import platform
+import subprocess
+import asyncio
 
 # Add the project root directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-import subprocess
-import asyncio
 from src.error_handler import KNIMEError
 from config.settings import KNIME_WORKFLOW_DIR, KNIME_EXECUTABLE, BASE_DIR
 import logging
 from datetime import datetime
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class KNIMERunner:
-    def __init__(self, knime_executable):
-        self.knime_executable = knime_executable
+    def __init__(self):
+        self.knime_executable = KNIME_EXECUTABLE
         self.log_dir = os.path.join(BASE_DIR, 'logs')
         os.makedirs(self.log_dir, exist_ok=True)
 
@@ -42,11 +43,16 @@ class KNIMERunner:
                 f.write(f"KNIME workflow started at: {start_time}\n")
                 f.flush()
 
+                # Set creationflags conditionally based on the OS
+                creationflags = 0
+                if platform.system() == "Windows":
+                    creationflags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+
                 process = await asyncio.create_subprocess_exec(
                     *command,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+                    creationflags=creationflags if platform.system() == "Windows" else None
                 )
 
                 async def log_stream(stream):
@@ -59,6 +65,7 @@ class KNIMERunner:
                         else:
                             break
 
+                # Only log to the file, not to the console
                 await asyncio.gather(
                     log_stream(process.stdout),
                     log_stream(process.stderr)
@@ -73,16 +80,22 @@ class KNIMERunner:
                 f.flush()
 
             if return_code != 0:
-                raise subprocess.CalledProcessError(return_code, command)
+                error_message = f"KNIME workflow execution failed with exit code {return_code}. Check log file for details: {log_file}"
+                logger.error(error_message)
+                raise KNIMEError(error_message)
 
             logger.info(f"KNIME workflow completed successfully. Output logged to {log_file}")
 
         except subprocess.CalledProcessError as e:
             error_message = f"KNIME workflow execution failed. Exit code: {e.returncode}. Check log file for details."
+            logger.error(error_message)
             raise KNIMEError(error_message)
+        except Exception as e:
+            logger.error(f"Unexpected error while running KNIME workflow: {str(e)}")
+            raise KNIMEError(f"Unexpected error while running KNIME workflow: {str(e)}")
 
 async def main():
-    runner = KNIMERunner(KNIME_EXECUTABLE)
+    runner = KNIMERunner()
     try:
         await runner.run_workflow()
     except KNIMEError as e:

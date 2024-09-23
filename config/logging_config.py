@@ -1,10 +1,12 @@
+# logging_config.py
+
 import logging
 import logging.config
 import os
-from config.settings import BASE_DIR, LOG_LEVEL
+from config.settings import BASE_DIR, LOG_LEVEL, LOG_FILE
 
 # Ensure the logs directory exists
-log_dir = os.path.join(BASE_DIR, 'logs')
+log_dir = os.path.dirname(LOG_FILE)
 os.makedirs(log_dir, exist_ok=True)
 
 LOGGING = {
@@ -20,14 +22,14 @@ LOGGING = {
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': LOG_LEVEL,
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
         'file': {
-            'level': 'DEBUG',
+            'level': LOG_LEVEL,
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(log_dir, 'app.log'),
+            'filename': LOG_FILE,
             'maxBytes': 1024 * 1024 * 5,  # 5 MB
             'backupCount': 5,
             'formatter': 'verbose',
@@ -36,28 +38,6 @@ LOGGING = {
     'root': {
         'handlers': ['console', 'file'],
         'level': LOG_LEVEL,
-    },
-    'loggers': {
-        'socrata_api': {
-            'handlers': ['console', 'file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
-        'data_processor': {
-            'handlers': ['console', 'file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
-        'file_manager': {
-            'handlers': ['console', 'file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
-        'knime_runner': {
-            'handlers': ['console', 'file'],
-            'level': LOG_LEVEL,
-            'propagate': False,
-        },
     },
 }
 
