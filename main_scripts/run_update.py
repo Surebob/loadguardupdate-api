@@ -47,10 +47,9 @@ async def update_flag_file():
         try:
             with open(FLAG_FILE, 'w') as f:
                 f.write(str(time.time()))
-            logger.debug(f"Flag file updated at {time.time()}")
         except Exception as e:
             logger.error(f"Failed to update flag file: {e}")
-        await asyncio.sleep(0.2)  # Update every 0.2 seconds instead of 1 second
+        await asyncio.sleep(0.2)
 
 async def update_datasets():
     logger.info("Starting dataset update")
@@ -144,6 +143,10 @@ async def main():
         scheduler = AsyncIOScheduler(timezone=TIMEZONE)
         scheduler.add_listener(job_error_listener, EVENT_JOB_ERROR)
 
+        # Start the scheduler BEFORE adding jobs
+        scheduler.start()
+        logger.info("Scheduler started")
+
         # Schedule dataset updates
         dataset_update_hour, dataset_update_minute = map(int, DATASET_UPDATE_TIME.split(":"))
         scheduler.add_job(
@@ -154,6 +157,7 @@ async def main():
                 timezone=TIMEZONE
             ),
             id='dataset_update',
+            replace_existing=True
         )
         logger.info(f"Scheduled dataset updates daily at {DATASET_UPDATE_TIME} {TIMEZONE}")
 
@@ -167,35 +171,37 @@ async def main():
                 timezone=TIMEZONE
             ),
             id='knime_workflow',
+            replace_existing=True
         )
         logger.info(f"Scheduled KNIME workflow daily at {KNIME_WORKFLOW_TIME} {TIMEZONE}")
 
-        # Start the scheduler before running initial update
-        scheduler.start()
-        logger.info("Scheduler started and running")
-
-        # Run initial update
+        # Run initial update (optional - remove if you don't want immediate execution)
         logger.info("Running initial update...")
         await update_datasets()
         logger.info("Initial update completed")
 
-        # Run initial KNIME workflow
+        # Run initial KNIME workflow (optional - remove if you don't want immediate execution)
         logger.info("Running initial KNIME workflow...")
         await run_knime_workflow()
         logger.info("Initial KNIME workflow completed")
 
-        # Keep the script running and monitor scheduler
+        # Modify the monitoring loop to log less frequently
+        last_log_time = 0
         while keep_updating_flag:
-            await asyncio.sleep(1)
+            await asyncio.sleep(60)  # Check every minute instead of every second
+            current_time = time.time()
+            
+            # Log schedule info every 30 minutes
+            if current_time - last_log_time >= 1800:  # 1800 seconds = 30 minutes
+                next_dataset_run = scheduler.get_job('dataset_update').next_run_time
+                next_knime_run = scheduler.get_job('knime_workflow').next_run_time
+                logger.info(f"Next scheduled runs - Dataset: {next_dataset_run}, KNIME: {next_knime_run}")
+                last_log_time = current_time
+
             if scheduler and not scheduler.running:
                 logger.error("Scheduler stopped running unexpectedly")
                 scheduler.start()
                 logger.info("Scheduler restarted")
-            else:
-                next_dataset_run = scheduler.get_job('dataset_update').next_run_time
-                next_knime_run = scheduler.get_job('knime_workflow').next_run_time
-                logger.debug(f"Next scheduled dataset update: {next_dataset_run}")
-                logger.debug(f"Next scheduled KNIME workflow: {next_knime_run}")
 
     except (KeyboardInterrupt, SystemExit):
         logger.info("Scheduler stopped by user")
