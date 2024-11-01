@@ -30,7 +30,8 @@ from apscheduler.triggers.date import DateTrigger
 from apscheduler.events import EVENT_JOB_ERROR
 from src.zip_processor import ZipProcessor
 
-FLAG_FILE = "script_running.flag"
+# Set the flag file path relative to the script's directory
+FLAG_FILE = os.path.join(os.path.dirname(__file__), '..', 'script_running.flag')
 
 # Global variables
 keep_updating_flag = True
@@ -42,11 +43,14 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 async def update_flag_file():
-    global keep_updating_flag
-    while keep_updating_flag:
-        with open(FLAG_FILE, 'w') as f:
-            f.write(str(time.time()))
-        await asyncio.sleep(1)
+    while True:
+        try:
+            with open(FLAG_FILE, 'w') as f:
+                f.write(str(time.time()))
+            logger.debug(f"Flag file updated at {time.time()}")
+        except Exception as e:
+            logger.error(f"Failed to update flag file: {e}")
+        await asyncio.sleep(0.2)  # Update every 0.2 seconds instead of 1 second
 
 async def update_datasets():
     logger.info("Starting dataset update")
@@ -78,7 +82,8 @@ async def update_datasets():
 
         # Process ZIP files after all updates are complete
         zip_processor = ZipProcessor(DATA_DIR)
-        if zip_processor.process_all_zips():
+        # Add await here
+        if await zip_processor.process_all_zips():  # Added await
             logger.info("ZIP files processed successfully")
         else:
             logger.info("No ZIP files needed processing")
@@ -131,13 +136,10 @@ async def main():
     global scheduler, keep_updating_flag
     logger.info("Starting the update process")
 
-    # Start the flag file update task
-    flag_update_task = asyncio.create_task(update_flag_file())
-    
     try:
-        # Run dataset update immediately on startup
-        await update_datasets()
-
+        # Start the flag file update task FIRST
+        flag_update_task = asyncio.create_task(update_flag_file())
+        
         # Initialize the scheduler with timezone awareness
         scheduler = AsyncIOScheduler(timezone=TIMEZONE)
         scheduler.add_listener(job_error_listener, EVENT_JOB_ERROR)
@@ -147,7 +149,9 @@ async def main():
         scheduler.add_job(
             update_datasets,
             CronTrigger(
-                hour=dataset_update_hour, minute=dataset_update_minute, timezone=TIMEZONE
+                hour=dataset_update_hour, 
+                minute=dataset_update_minute, 
+                timezone=TIMEZONE
             ),
             id='dataset_update',
         )
@@ -158,24 +162,40 @@ async def main():
         scheduler.add_job(
             run_knime_workflow,
             CronTrigger(
-                hour=knime_workflow_hour, minute=knime_workflow_minute, timezone=TIMEZONE
+                hour=knime_workflow_hour, 
+                minute=knime_workflow_minute, 
+                timezone=TIMEZONE
             ),
             id='knime_workflow',
         )
         logger.info(f"Scheduled KNIME workflow daily at {KNIME_WORKFLOW_TIME} {TIMEZONE}")
 
-        # Start the scheduler
+        # Start the scheduler before running initial update
         scheduler.start()
+        logger.info("Scheduler started and running")
 
-        # Setup signal handlers
-        if platform.system() != "Windows":
-            loop = asyncio.get_running_loop()
-            for sig in (signal.SIGINT, signal.SIGTERM):
-                loop.add_signal_handler(sig, handle_shutdown)
+        # Run initial update
+        logger.info("Running initial update...")
+        await update_datasets()
+        logger.info("Initial update completed")
 
-        # Keep the script running
+        # Run initial KNIME workflow
+        logger.info("Running initial KNIME workflow...")
+        await run_knime_workflow()
+        logger.info("Initial KNIME workflow completed")
+
+        # Keep the script running and monitor scheduler
         while keep_updating_flag:
             await asyncio.sleep(1)
+            if scheduler and not scheduler.running:
+                logger.error("Scheduler stopped running unexpectedly")
+                scheduler.start()
+                logger.info("Scheduler restarted")
+            else:
+                next_dataset_run = scheduler.get_job('dataset_update').next_run_time
+                next_knime_run = scheduler.get_job('knime_workflow').next_run_time
+                logger.debug(f"Next scheduled dataset update: {next_dataset_run}")
+                logger.debug(f"Next scheduled KNIME workflow: {next_knime_run}")
 
     except (KeyboardInterrupt, SystemExit):
         logger.info("Scheduler stopped by user")
@@ -184,14 +204,17 @@ async def main():
         logger.error(f"Unexpected error: {str(e)}")
         handle_shutdown()
     finally:
-        # Clean up flag update task
-        flag_update_task.cancel()
-        try:
-            await flag_update_task
-        except asyncio.CancelledError:
-            pass
+        # Clean up
+        if 'flag_update_task' in locals():
+            flag_update_task.cancel()
+            try:
+                await flag_update_task
+            except asyncio.CancelledError:
+                pass
         
-        # Remove flag file if it exists
+        if scheduler and scheduler.running:
+            scheduler.shutdown()
+        
         if os.path.exists(FLAG_FILE):
             try:
                 os.remove(FLAG_FILE)
