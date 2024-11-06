@@ -184,18 +184,20 @@ async def main():
         await run_knime_workflow()
         logger.info("Initial KNIME workflow completed")
 
+        # Show next scheduled runs after initial completion
+        next_dataset_run = scheduler.get_job('dataset_update').next_run_time
+        next_knime_run = scheduler.get_job('knime_workflow').next_run_time
+        logger.info(f"Next scheduled dataset update: {next_dataset_run}")
+        logger.info(f"Next scheduled KNIME workflow: {next_knime_run}")
+        logger.info("Waiting for next scheduled run...")
+
         # Keep the script running and monitor scheduler
         while keep_updating_flag:
-            await asyncio.sleep(1)
-            if scheduler and not scheduler.running:
+            await asyncio.sleep(60)  # Check every minute instead of every second
+            if not scheduler or not scheduler.running:
                 logger.error("Scheduler stopped running unexpectedly")
                 scheduler.start()
                 logger.info("Scheduler restarted")
-            else:
-                next_dataset_run = scheduler.get_job('dataset_update').next_run_time
-                next_knime_run = scheduler.get_job('knime_workflow').next_run_time
-                logger.debug(f"Next scheduled dataset update: {next_dataset_run}")
-                logger.debug(f"Next scheduled KNIME workflow: {next_knime_run}")
 
     except (KeyboardInterrupt, SystemExit):
         logger.info("Scheduler stopped by user")

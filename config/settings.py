@@ -7,8 +7,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # KNIME settings
-KNIME_EXECUTABLE = os.environ.get('KNIME_EXECUTABLE', r"C:\KNIME\knime.exe")
-KNIME_WORKFLOW_DIR = os.environ.get('KNIME_WORKFLOW_DIR', r"C:\Users\Loadguard\knime-workspace\LoadGuard_Data_WorkflowFINALFINALFINAL")
+KNIME_EXECUTABLE = os.environ.get('KNIME_EXECUTABLE', r"C:\Users\wgtgr\AppData\Local\Programs\KNIME\knime.exe")
+KNIME_WORKFLOW_DIR = os.environ.get('KNIME_WORKFLOW_DIR', r"C:\Users\wgtgr\knime-workspace\test_workflow")
 
 # Timezone
 TIMEZONE = pytz.timezone(os.environ.get('TIMEZONE', "America/Los_Angeles"))  # PST

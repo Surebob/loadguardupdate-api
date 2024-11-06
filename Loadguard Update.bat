@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 set "SCRIPT_NAME=run_update.py"
 set "SCRIPT_PATH=main_scripts\run_update.py"
 set "FLAG_FILE=script_running.flag"
-set "MAX_AGE_SECONDS=20"  :: Increased to 20 seconds to allow for ZIP processing
+set "MAX_AGE_SECONDS=20"
 set "CHECK_INTERVAL=3"
 
 :start
@@ -27,11 +27,10 @@ if not exist "%FLAG_FILE%" (
 for /f %%A in ('powershell -command "$fileAge = (Get-Date) - (Get-Item '%FLAG_FILE%').LastWriteTime; [math]::Round($fileAge.TotalSeconds * 100)"') do set "age_int=%%A"
 set /a age_seconds=%age_int% / 100
 set /a age_decimal=%age_int% %% 100
-echo Flag file age: %age_seconds%.%age_decimal% seconds
 
 set /a max_age_int=%MAX_AGE_SECONDS% * 100
 if %age_int% gtr %max_age_int% (
-    echo Flag file is too old ^(%age_seconds%.%age_decimal% seconds^). MAX_AGE_SECONDS is %MAX_AGE_SECONDS%. Restarting script.
+    echo Flag file is too old. Restarting script.
     goto :restart
 )
 

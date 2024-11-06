@@ -67,7 +67,6 @@ class SocrataUpdater:
                 raise APIError(f"No 'rowsUpdatedAt' field found for dataset at {url}")
 
     async def download_file(self, url, local_path):
-        self.logger.info(f"Downloading {url} to {local_path}")
         progress = ProgressBar(f"Downloading {os.path.basename(local_path)}")
         try:
             async with self.session.get(url) as response:
@@ -82,7 +81,7 @@ class SocrataUpdater:
             progress.finish()
         except Exception as e:
             progress.finish()
-            raise APIError(f"Failed to download {url}: {str(e)}")
+            raise APIError(f"Failed to download: {str(e)}")
 
     async def read_metadata(self, metadata_file):
         try:
