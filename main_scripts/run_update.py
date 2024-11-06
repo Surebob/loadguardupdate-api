@@ -82,11 +82,18 @@ async def update_datasets():
 
         # Process ZIP files after all updates are complete
         zip_processor = ZipProcessor(DATA_DIR)
-        # Add await here
-        if await zip_processor.process_all_zips():  # Added await
+        if await zip_processor.process_all_zips():
             logger.info("ZIP files processed successfully")
         else:
             logger.info("No ZIP files needed processing")
+
+        # Add next scheduled runs info
+        if scheduler:
+            next_dataset_run = scheduler.get_job('dataset_update').next_run_time
+            next_knime_run = scheduler.get_job('knime_workflow').next_run_time
+            logger.info(f"Next dataset update scheduled for: {next_dataset_run}")
+            logger.info(f"Next KNIME workflow scheduled for: {next_knime_run}")
+            logger.info("Waiting for next scheduled run...")
 
     except Exception as e:
         logger.error(f"Error during dataset update: {str(e)}")
@@ -100,6 +107,15 @@ async def run_knime_workflow():
         await knime_runner.run_workflow()
         logger.info("KNIME workflow executed successfully")
         knime_retry_count = 0  # Reset the counter on success
+
+        # Add next scheduled runs info
+        if scheduler:
+            next_dataset_run = scheduler.get_job('dataset_update').next_run_time
+            next_knime_run = scheduler.get_job('knime_workflow').next_run_time
+            logger.info(f"Next dataset update scheduled for: {next_dataset_run}")
+            logger.info(f"Next KNIME workflow scheduled for: {next_knime_run}")
+            logger.info("Waiting for next scheduled run...")
+
     except KNIMEError as e:
         logger.error(f"Error running KNIME workflow: {str(e)}")
         if knime_retry_count < MAX_KNIME_RETRIES:
