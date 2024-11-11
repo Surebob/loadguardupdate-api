@@ -4,3 +4,4 @@ pytz
 schedule
 apscheduler
 python-dateutil
+pywin32>=306

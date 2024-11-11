@@ -8,12 +8,13 @@ import signal
 import logging
 import time
 import aiohttp
+import pyautogui
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.socrata_updater import SocrataUpdater
 from src.ftp_handler import FTPHandler
 from src.sms_handler import SMSHandler
-from main_scripts.knime_runner import KNIMERunner
+from main_scripts.knimeclicker import perform_clicks
 from config.settings import (
     KNIME_EXECUTABLE,
     DATA_DIR,
@@ -41,6 +42,10 @@ knime_retry_count = 0
 # Configure logging
 configure_logging()
 logger = logging.getLogger(__name__)
+
+# Define the coordinates for the clicks
+first_click_coordinates = (207, 90)  # Replace with your coordinates
+second_click_coordinates = (408, 89)  # Replace with your coordinates
 
 async def update_flag_file():
     while True:
@@ -90,54 +95,19 @@ async def update_datasets():
         # Add next scheduled runs info
         if scheduler:
             next_dataset_run = scheduler.get_job('dataset_update').next_run_time
-            next_knime_run = scheduler.get_job('knime_workflow').next_run_time
+            next_click_run = scheduler.get_job('perform_clicks_job').next_run_time
             logger.info(f"Next dataset update scheduled for: {next_dataset_run}")
-            logger.info(f"Next KNIME workflow scheduled for: {next_knime_run}")
+            logger.info(f"Next click sequence scheduled for: {next_click_run}")
             logger.info("Waiting for next scheduled run...")
 
     except Exception as e:
         logger.error(f"Error during dataset update: {str(e)}")
         raise
 
-async def run_knime_workflow():
-    global knime_retry_count
-    logger.info("Starting KNIME workflow")
-    knime_runner = KNIMERunner()
-    try:
-        await knime_runner.run_workflow()
-        logger.info("KNIME workflow executed successfully")
-        knime_retry_count = 0  # Reset the counter on success
-
-        # Add next scheduled runs info
-        if scheduler:
-            next_dataset_run = scheduler.get_job('dataset_update').next_run_time
-            next_knime_run = scheduler.get_job('knime_workflow').next_run_time
-            logger.info(f"Next dataset update scheduled for: {next_dataset_run}")
-            logger.info(f"Next KNIME workflow scheduled for: {next_knime_run}")
-            logger.info("Waiting for next scheduled run...")
-
-    except KNIMEError as e:
-        logger.error(f"Error running KNIME workflow: {str(e)}")
-        if knime_retry_count < MAX_KNIME_RETRIES:
-            knime_retry_count += 1
-            logger.warning(f"KNIME workflow failed. Will retry in 5 minutes. Retry {knime_retry_count}/{MAX_KNIME_RETRIES}.")
-            await schedule_knime_retry()
-        else:
-            logger.critical("Maximum KNIME workflow retries reached. No further retries will be scheduled.")
-
-async def schedule_knime_retry():
-    retry_time = datetime.now(TIMEZONE) + timedelta(minutes=5)
-    logger.info(f"Scheduling KNIME workflow retry at {retry_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-    scheduler.add_job(
-        run_knime_workflow,
-        DateTrigger(run_date=retry_time),
-        id='knime_retry',
-        replace_existing=True,
-    )
-
 def job_error_listener(event):
     if event.exception:
         logger.error(f"Job {event.job_id} raised an exception: {event.exception}", exc_info=True)
+        logger.error("Exception details:", exc_info=event.exception)
     else:
         logger.info(f"Job {event.job_id} executed successfully")
 
@@ -170,41 +140,45 @@ async def main():
                 timezone=TIMEZONE
             ),
             id='dataset_update',
+            name='Dataset Update Job'
         )
         logger.info(f"Scheduled dataset updates daily at {DATASET_UPDATE_TIME} {TIMEZONE}")
 
-        # Schedule KNIME workflow
-        knime_workflow_hour, knime_workflow_minute = map(int, KNIME_WORKFLOW_TIME.split(":"))
+        # Schedule the perform_clicks function
+        click_time_hour, click_time_minute = map(int, KNIME_WORKFLOW_TIME.split(":"))
         scheduler.add_job(
-            run_knime_workflow,
+            perform_clicks,
             CronTrigger(
-                hour=knime_workflow_hour, 
-                minute=knime_workflow_minute, 
+                hour=click_time_hour,
+                minute=click_time_minute,
                 timezone=TIMEZONE
             ),
-            id='knime_workflow',
+            id='perform_clicks_job',
+            name='Click Sequence Job'
         )
-        logger.info(f"Scheduled KNIME workflow daily at {KNIME_WORKFLOW_TIME} {TIMEZONE}")
+        logger.info(f"Scheduled click sequence daily at {KNIME_WORKFLOW_TIME} {TIMEZONE}")
 
         # Start the scheduler before running initial update
         scheduler.start()
         logger.info("Scheduler started and running")
+        
+        # Log all scheduled jobs
+        jobs = scheduler.get_jobs()
+        logger.info("Currently scheduled jobs:")
+        for job in jobs:
+            next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S %Z") if job.next_run_time else "Not scheduled"
+            logger.info(f"Job ID: {job.id}, Name: {job.name}, Next run: {next_run}")
 
         # Run initial update
         logger.info("Running initial update...")
         await update_datasets()
         logger.info("Initial update completed")
 
-        # Run initial KNIME workflow
-        logger.info("Running initial KNIME workflow...")
-        await run_knime_workflow()
-        logger.info("Initial KNIME workflow completed")
-
         # Show next scheduled runs after initial completion
         next_dataset_run = scheduler.get_job('dataset_update').next_run_time
-        next_knime_run = scheduler.get_job('knime_workflow').next_run_time
+        next_click_run = scheduler.get_job('perform_clicks_job').next_run_time
         logger.info(f"Next scheduled dataset update: {next_dataset_run}")
-        logger.info(f"Next scheduled KNIME workflow: {next_knime_run}")
+        logger.info(f"Next scheduled clicks: {next_click_run}")
         logger.info("Waiting for next scheduled run...")
 
         # Keep the script running and monitor scheduler

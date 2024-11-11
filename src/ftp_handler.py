@@ -21,7 +21,24 @@ class FTPHandler:
         for file_type in ['Crash', 'Inspection', 'Violation']:
             dataset_name = f'FTP_{file_type}'
             local_dir = os.path.join(self.base_dir, dataset_name)
-            os.makedirs(local_dir, exist_ok=True)
+            
+            # Create directory with explicit error handling
+            try:
+                if not os.path.exists(local_dir):
+                    os.makedirs(local_dir)
+                    self.logger.debug(f"Created directory: {local_dir}")
+                
+                # Create Extracted subdirectory here
+                extract_dir = os.path.join(local_dir, 'Extracted')
+                if not os.path.exists(extract_dir):
+                    os.makedirs(extract_dir)
+                    self.logger.debug(f"Created Extracted directory: {extract_dir}")
+            except PermissionError as pe:
+                self.logger.error(f"Permission error creating directory {local_dir}: {str(pe)}")
+                continue
+            except Exception as e:
+                self.logger.error(f"Error creating directory {local_dir}: {str(e)}")
+                continue
 
             latest_remote_file = await self.find_latest_file(file_type)
             if not latest_remote_file:
@@ -36,15 +53,28 @@ class FTPHandler:
                     self.logger.info(f"No update needed for {dataset_name}")
                     continue
 
-            # Remove old files
-            for old_file in os.listdir(local_dir):
-                os.remove(os.path.join(local_dir, old_file))
-                self.logger.info(f"Removed old file: {old_file}")
+            # Remove old files with error handling
+            try:
+                for old_file in os.listdir(local_dir):
+                    old_file_path = os.path.join(local_dir, old_file)
+                    if os.path.isfile(old_file_path):  # Only remove files, not directories
+                        try:
+                            os.remove(old_file_path)
+                            self.logger.info(f"Removed old file: {old_file}")
+                        except PermissionError as pe:
+                            self.logger.error(f"Permission error removing file {old_file}: {str(pe)}")
+                        except Exception as e:
+                            self.logger.error(f"Error removing file {old_file}: {str(e)}")
+            except Exception as e:
+                self.logger.error(f"Error cleaning directory {local_dir}: {str(e)}")
 
             # Download the latest file
-            await self.download_file(latest_remote_file, local_dir)
-            updates.append(dataset_name)
-            self.logger.info(f"Downloaded latest file {latest_remote_file} for {dataset_name}")
+            try:
+                await self.download_file(latest_remote_file, local_dir)
+                updates.append(dataset_name)
+                self.logger.info(f"Downloaded latest file {latest_remote_file} for {dataset_name}")
+            except Exception as e:
+                self.logger.error(f"Error downloading {latest_remote_file}: {str(e)}")
 
         return len(updates) > 0
 

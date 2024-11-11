@@ -7,15 +7,15 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # KNIME settings
-KNIME_EXECUTABLE = os.environ.get('KNIME_EXECUTABLE', r"C:\Users\wgtgr\AppData\Local\Programs\KNIME\knime.exe")
-KNIME_WORKFLOW_DIR = os.environ.get('KNIME_WORKFLOW_DIR', r"C:\Users\wgtgr\knime-workspace\test_workflow")
+KNIME_EXECUTABLE = os.environ.get('KNIME_EXECUTABLE', r"C:\KNIME\knime.exe")
+KNIME_WORKFLOW_DIR = os.environ.get('KNIME_WORKFLOW_DIR', r"C:\Users\Loadguard\knime-workspace\Test1")
 
 # Timezone
 TIMEZONE = pytz.timezone(os.environ.get('TIMEZONE', "America/Los_Angeles"))  # PST
 
 # Dataset update times in "HH:MM" 24-hour format
-DATASET_UPDATE_TIME = os.environ.get('DATASET_UPDATE_TIME', "21:05")  # 11:00 PM
-KNIME_WORKFLOW_TIME = os.environ.get('KNIME_WORKFLOW_TIME', "21:07")  # 11:45 PM
+DATASET_UPDATE_TIME = os.environ.get('DATASET_UPDATE_TIME', "22:00")  # 11:00 PM
+KNIME_WORKFLOW_TIME = os.environ.get('KNIME_WORKFLOW_TIME', "23:45")  # 11:45 PM
 
 # Maximum number of retries for KNIME workflow
 MAX_KNIME_RETRIES = int(os.environ.get('MAX_KNIME_RETRIES', 5))
