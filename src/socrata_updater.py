@@ -10,11 +10,12 @@ from config.settings import DATA_DIR, DATASET_URLS
 from src.utils import ProgressBar
 
 class SocrataUpdater:
-    def __init__(self, session):
+    def __init__(self, session, status_tracker=None):
         self.datasets = DATASET_URLS
         self.base_dir = DATA_DIR
         self.logger = logging.getLogger(self.__class__.__name__)
         self.session = session
+        self.status_tracker = status_tracker
 
     async def update_and_download_datasets(self):
         any_updates = False
@@ -38,7 +39,7 @@ class SocrataUpdater:
                     download_url = f"{dataset_url}/rows.csv?accessType=DOWNLOAD&api_foundry=true"
                     file_path = os.path.join(dataset_dir, f"{dataset_name}.csv")
                     try:
-                        await self.download_file(download_url, file_path)
+                        await self.download_file(download_url, file_path, dataset_name)
                         await self.save_metadata(metadata_file, {
                             'rowsUpdatedAt': rows_updated_at.isoformat()
                         })
@@ -66,8 +67,12 @@ class SocrataUpdater:
             else:
                 raise APIError(f"No 'rowsUpdatedAt' field found for dataset at {url}")
 
-    async def download_file(self, url, local_path):
-        progress = ProgressBar(f"Downloading {os.path.basename(local_path)}")
+    async def download_file(self, url, local_path, dataset_name):
+        progress = ProgressBar(
+            f"Downloading {os.path.basename(local_path)}", 
+            status_tracker=self.status_tracker,
+            dataset_name=dataset_name
+        )
         try:
             async with self.session.get(url) as response:
                 response.raise_for_status()

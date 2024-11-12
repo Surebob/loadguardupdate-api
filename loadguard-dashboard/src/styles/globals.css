@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-color: #262630;
+  --secondary-color: #15151B;
+  --accent-color: #F5C344;
+  --accent2-color: #1E1E27;
+  --details-color: #76777F;
+  --red-color: #EF4A53;
+  --green-color: #53A762;
+  --button-color: #343442;
+  --secondary2-color: #17171E;
+  --text-color: #f7f7fc;
+  --details2-color: #3a3a42;
+  --box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.3);
+}
+
+body {
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+}
+
+@keyframes heartbeat {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.1);
+  }
+  50% {
+    transform: scale(1);
+  }
+  75% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.heartbeat {
+  display: inline-block;
+  animation: heartbeat 2s ease-in-out infinite;
+}
+
+.stroke-round {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.heartbeat-line {
+  stroke-dasharray: 48, 144;
+  stroke-dashoffset: 192;
+  animation: heartbeat 1.4s linear infinite;
+}
+
+@keyframes heartbeat {
+  72.5% {
+    opacity: 0;
+  }
+  to {
+    stroke-dashoffset: 0;
+
+  }
+} 

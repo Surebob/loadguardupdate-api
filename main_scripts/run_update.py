@@ -16,12 +16,11 @@ from src.ftp_handler import FTPHandler
 from src.sms_handler import SMSHandler
 from main_scripts.knimeclicker import perform_clicks
 from config.settings import (
-    KNIME_EXECUTABLE,
-    DATA_DIR,
     TIMEZONE,
     DATASET_UPDATE_TIME,
-    KNIME_WORKFLOW_TIME,
-    MAX_KNIME_RETRIES
+    CLICKER_SCHEDULE_TIME,
+    MAX_KNIME_RETRIES,
+    DATA_DIR
 )
 from src.error_handler import KNIMEError
 from config.logging_config import configure_logging
@@ -95,7 +94,7 @@ async def update_datasets():
         # Add next scheduled runs info
         if scheduler:
             next_dataset_run = scheduler.get_job('dataset_update').next_run_time
-            next_click_run = scheduler.get_job('perform_clicks_job').next_run_time
+            next_click_run = scheduler.get_job('clicker_job').next_run_time
             logger.info(f"Next dataset update scheduled for: {next_dataset_run}")
             logger.info(f"Next click sequence scheduled for: {next_click_run}")
             logger.info("Waiting for next scheduled run...")
@@ -145,7 +144,7 @@ async def main():
         logger.info(f"Scheduled dataset updates daily at {DATASET_UPDATE_TIME} {TIMEZONE}")
 
         # Schedule the perform_clicks function
-        click_time_hour, click_time_minute = map(int, KNIME_WORKFLOW_TIME.split(":"))
+        click_time_hour, click_time_minute = map(int, CLICKER_SCHEDULE_TIME.split(":"))
         scheduler.add_job(
             perform_clicks,
             CronTrigger(
@@ -153,10 +152,10 @@ async def main():
                 minute=click_time_minute,
                 timezone=TIMEZONE
             ),
-            id='perform_clicks_job',
+            id='clicker_job',
             name='Click Sequence Job'
         )
-        logger.info(f"Scheduled click sequence daily at {KNIME_WORKFLOW_TIME} {TIMEZONE}")
+        logger.info(f"Scheduled click sequence daily at {CLICKER_SCHEDULE_TIME} {TIMEZONE}")
 
         # Start the scheduler before running initial update
         scheduler.start()
@@ -176,7 +175,7 @@ async def main():
 
         # Show next scheduled runs after initial completion
         next_dataset_run = scheduler.get_job('dataset_update').next_run_time
-        next_click_run = scheduler.get_job('perform_clicks_job').next_run_time
+        next_click_run = scheduler.get_job('clicker_job').next_run_time
         logger.info(f"Next scheduled dataset update: {next_dataset_run}")
         logger.info(f"Next scheduled clicks: {next_click_run}")
         logger.info("Waiting for next scheduled run...")

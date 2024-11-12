@@ -1,7 +1,13 @@
 aiohttp
 aiofiles
 pytz
-schedule
 apscheduler
 python-dateutil
 pywin32>=306
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.4.2
+pydantic-settings>=2.0.3
+python-multipart>=0.0.6
+psutil
+sse-starlette>=1.6.5

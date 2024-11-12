@@ -1,0 +1,82 @@
+[
+  {
+    "type": "socrata",
+    "status": "success",
+    "timestamp": "2024-11-11T10:16:07.849866",
+    "details": {
+      "updated": true
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "no_update",
+    "timestamp": "2024-11-11T10:20:27.193635",
+    "details": {
+      "updated": false
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "no_update",
+    "timestamp": "2024-11-11T10:21:29.106011",
+    "details": {
+      "updated": false
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "no_update",
+    "timestamp": "2024-11-11T10:22:52.579848",
+    "details": {
+      "updated": false
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "success",
+    "timestamp": "2024-11-11T10:28:28.725533",
+    "details": {
+      "updated": true
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "success",
+    "timestamp": "2024-11-11T11:22:26.385887",
+    "details": {
+      "updated": true
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "updating",
+    "timestamp": "2024-11-11T14:27:26.658307",
+    "details": {
+      "message": "Starting Socrata updates"
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "updating",
+    "timestamp": "2024-11-11T14:34:45.917058",
+    "details": {
+      "message": "Starting Socrata updates"
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "success",
+    "timestamp": "2024-11-11T14:39:57.384427",
+    "details": {
+      "updated": true
+    }
+  },
+  {
+    "type": "socrata",
+    "status": "updating",
+    "timestamp": "2024-11-11T14:41:13.684858",
+    "details": {
+      "message": "Starting Socrata updates"
+    }
+  }
+]

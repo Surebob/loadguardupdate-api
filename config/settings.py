@@ -15,7 +15,7 @@ TIMEZONE = pytz.timezone(os.environ.get('TIMEZONE', "America/Los_Angeles"))  # P
 
 # Dataset update times in "HH:MM" 24-hour format
 DATASET_UPDATE_TIME = os.environ.get('DATASET_UPDATE_TIME', "22:00")  # 11:00 PM
-KNIME_WORKFLOW_TIME = os.environ.get('KNIME_WORKFLOW_TIME', "23:45")  # 11:45 PM
+CLICKER_SCHEDULE_TIME = os.environ.get('CLICKER_SCHEDULE_TIME', "23:45")  # 11:45 PM
 
 # Maximum number of retries for KNIME workflow
 MAX_KNIME_RETRIES = int(os.environ.get('MAX_KNIME_RETRIES', 5))

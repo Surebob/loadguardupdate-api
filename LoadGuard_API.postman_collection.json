@@ -1,0 +1,27 @@
+{
+  "info": {
+    "name": "LoadGuard API",
+    "description": "API endpoints for LoadGuard Update System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Status",
+      "item": [
+        {
+          "name": "System Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8000/api/status/system",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000",
+              "path": ["api", "status", "system"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+} 
